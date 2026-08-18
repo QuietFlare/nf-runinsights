@@ -12,3 +12,6 @@ test-pipeline/work/
 test-pipeline/.nextflow*
 test-pipeline/.history/
 test-pipeline/runinsights-report.md
+__pycache__/
+*.pyc
+test-pipeline/.history.jsonl
