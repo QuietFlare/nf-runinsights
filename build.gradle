@@ -1,0 +1,27 @@
+plugins {
+    id 'io.nextflow.nextflow-plugin' version '1.0.0-beta.10'
+}
+
+version = '0.1.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // official Anthropic SDK — used only by the opt-in AI narration layer;
+    // the deterministic engine has no dependency on it
+    implementation 'com.anthropic:anthropic-java:2.34.0'
+}
+
+nextflowPlugin {
+    nextflowVersion = '24.10.0'
+
+    provider = 'quietflare'
+    className = 'quietflare.plugin.RuninsightsPlugin'
+    extensionPoints = [
+        'quietflare.plugin.RuninsightsExtension',
+        'quietflare.plugin.RuninsightsFactory'
+    ]
+
+}
