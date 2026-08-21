@@ -1,5 +1,5 @@
 # Releases the Python readers (dashboard + MCP server) to PyPI as
-# nf-runinsights-dashboard on every v* tag, via PyPI trusted publishing:
+# nf-runinsights-dashboard on every pypi-v* tag, via PyPI trusted publishing:
 # no token secret needed. One-time setup on pypi.org under
 # "Publishing" (add a publisher, or a pending publisher before the first
 # release): repository QuietFlare/nf-runinsights, workflow
@@ -8,7 +8,7 @@ name: release dashboard to PyPI
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["pypi-v*"]
   workflow_dispatch:
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
       - name: Check tag matches pyproject.toml version
         if: github.ref_type == 'tag'
         run: |
-          tag="${GITHUB_REF_NAME#v}"
+          tag="${GITHUB_REF_NAME#pypi-v}"
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)
           if [ "$tag" != "$version" ]; then
             echo "tag v$tag does not match pyproject.toml version $version" >&2

@@ -1,11 +1,11 @@
 # Releases the Nextflow plugin to the plugin registry (registry.nextflow.io)
-# on every v* tag. Needs the NPR_API_KEY repository secret (create an API key
+# on every plugin-v* tag. Needs the NPR_API_KEY repository secret (create an API key
 # at registry.nextflow.io, then add it under Settings > Secrets > Actions).
 name: release plugin to Nextflow registry
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["plugin-v*"]
   workflow_dispatch:
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
       - name: Check tag matches build.gradle version
         if: github.ref_type == 'tag'
         run: |
-          tag="${GITHUB_REF_NAME#v}"
+          tag="${GITHUB_REF_NAME#plugin-v}"
           version=$(sed -n "s/^version = '\(.*\)'/\1/p" build.gradle)
           if [ "$tag" != "$version" ]; then
             echo "tag v$tag does not match build.gradle version $version" >&2
