@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nf-runinsights-dashboard"
+version = "0.1.0"
+description = "Local dashboard and MCP server for the nf-runinsights Nextflow plugin's run history store"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.9"
+keywords = ["nextflow", "pipeline", "benchmarking", "bioinformatics", "mcp"]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Environment :: Web Environment",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+# the dashboard and store are stdlib-only by design; extras are opt-in doors
+dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mcp"]
+ask = ["anthropic"]
+
+[project.scripts]
+nf-runinsights-dashboard = "nf_runinsights.dashboard:main"
+nf-runinsights-mcp = "nf_runinsights.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/QuietFlare/nf-runinsights"
+Issues = "https://github.com/QuietFlare/nf-runinsights/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nf_runinsights"]
+
+[tool.hatch.build.targets.sdist]
+include = ["nf_runinsights", "README.md", "COPYING"]

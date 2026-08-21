@@ -132,16 +132,27 @@ never written.
 
 ## Dashboard
 
-A local web UI over the store. Python standard library only, no installs:
+A local web UI over the store. Python standard library only:
 
 ```bash
-python3 dashboard/app.py            # http://localhost:8765
-python3 dashboard/app.py --history /shared/team/runinsights
+pipx run nf-runinsights-dashboard   # http://localhost:8765
+```
+
+```bash
+pipx run nf-runinsights-dashboard --history /shared/team/runinsights
+```
+
+From a repo checkout the old door still works, no install at all:
+
+```bash
+python3 dashboard/app.py
 ```
 
 Pick runs, compare them side by side with deltas against a baseline, and
-optionally ask free-form questions (requires `pip install anthropic` and
-`ANTHROPIC_API_KEY`; everything else works without them).
+optionally ask free-form questions. Ask needs the `anthropic` package
+(`pipx run --spec 'nf-runinsights-dashboard[ask]' nf-runinsights-dashboard`,
+or `pip install anthropic` from a checkout) and `ANTHROPIC_API_KEY`;
+everything else works without them.
 
 ## MCP server
 
@@ -150,20 +161,20 @@ Gemini CLI, or an OpenAI agent. The server is read-only and contains no AI;
 the assistant that connects to it supplies the model.
 
 ```bash
-pip install mcp
-claude mcp add --scope user nf-runinsights -- \
-    /usr/local/bin/python3 /path/to/nf-runinsights/mcp-server/server.py
+pipx install 'nf-runinsights-dashboard[mcp]'
+claude mcp add --scope user nf-runinsights -- ~/.local/bin/nf-runinsights-mcp
 ```
 
-Use an absolute Python path: MCP clients spawn servers without your shell
-aliases, and the system `python3` on macOS is often too old.
+Use the absolute path: MCP clients spawn servers without your shell PATH.
+(From a repo checkout, `pip install mcp` and pointing the client at an
+absolute `python3` plus `mcp-server/server.py` still works.)
 
 Tools: `list_runs`, `get_run`, `compare_runs`, `get_process_trend`. Then ask
 your assistant things like "compare my last two sarek runs" or "why was last
 night's run slow".
 
-`python3 mcp-server/server.py --selftest` exercises every tool against the
-real store without an MCP client.
+`nf-runinsights-mcp --selftest` exercises every tool against the real store
+without an MCP client.
 
 ## AI narration
 
@@ -194,6 +205,10 @@ make install     # build and install into ~/.nextflow/plugins
 cd test-pipeline && nextflow run main.nf          # record a baseline
 cd test-pipeline && nextflow run main.nf --slow   # trigger a regression
 ```
+
+The Python readers live in `nf_runinsights/` and ship to PyPI as
+`nf-runinsights-dashboard` (`python3 -m build`, then twine upload). Keep
+its version in `pyproject.toml` in step with the plugin version.
 
 ## License
 

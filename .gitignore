@@ -14,4 +14,6 @@ test-pipeline/.history/
 test-pipeline/runinsights-report.md
 __pycache__/
 *.pyc
+dist/
+*.egg-info/
 test-pipeline/.history.jsonl
