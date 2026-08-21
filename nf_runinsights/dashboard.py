@@ -41,35 +41,71 @@ INDEX_HTML = """<!doctype html>
 <html><head><meta charset="utf-8"><title>nf-runinsights</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root { color-scheme: dark; }
-  body { background:#0f1117; color:#e2e8f0; font:15px/1.5 -apple-system, system-ui, sans-serif;
-         max-width:960px; margin:0 auto; padding:1.5rem 1rem; }
-  h1 { font-size:1.5rem; margin:0; } h1 small { color:#64748b; font-weight:400; font-size:0.9rem; }
-  h2 { font-size:1.05rem; border-bottom:1px solid #2d3748; padding-bottom:0.3rem; margin-top:1.6rem; }
-  select, input, button { background:#1a1f2b; color:#e2e8f0; border:1px solid #2d3748;
+  :root {
+    color-scheme: light;
+    --ink:#212529; --ink-2:#495057; --muted:#6c757d;
+    --surface:#ffffff; --panel:#f8f9fa; --line:#dee2e6; --line-soft:#e9ecef;
+    --brand:#0dc09d; --brand-ink:#0b7d63; --brand-dark:#096a54; --brand-soft:#e6f9f4;
+    --worse:#c92a2a; --better:#2b8a3e;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--surface); color:var(--ink); margin:0 auto; max-width:1000px;
+         padding:0 1.25rem 3rem;
+         font:15px/1.55 -apple-system, "Segoe UI", system-ui, Helvetica, Arial, sans-serif; }
+  header { border-top:4px solid var(--brand); border-bottom:1px solid var(--line);
+           margin:0 -1.25rem 1.4rem; padding:1.1rem 1.25rem 0.9rem;
+           display:flex; align-items:baseline; gap:0.6rem; flex-wrap:wrap; }
+  header svg { align-self:center; flex:none; }
+  h1 { font-size:1.35rem; font-weight:700; margin:0; letter-spacing:-0.01em; }
+  h1 small { color:var(--muted); font-weight:400; font-size:0.85rem; margin-left:0.35rem; }
+  .store { margin-left:auto; color:var(--muted); font-size:0.78rem;
+           font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+  h2 { font-size:1rem; font-weight:600; color:var(--ink);
+       border-bottom:2px solid var(--line); padding-bottom:0.35rem; margin:1.8rem 0 0.6rem; }
+  select, input { background:var(--surface); color:var(--ink); border:1px solid #ced4da;
          border-radius:6px; padding:0.4rem 0.7rem; font-size:0.9rem; }
-  button { cursor:pointer; } button:hover:not(:disabled) { border-color:#3b82f6; }
-  button:disabled { opacity:0.4; cursor:default; }
-  .primary { background:#3b82f6; border-color:#3b82f6; font-weight:600; }
+  button { background:var(--surface); color:var(--ink); border:1px solid #ced4da;
+         border-radius:6px; padding:0.4rem 0.8rem; font-size:0.9rem; cursor:pointer; }
+  button:hover:not(:disabled) { border-color:var(--brand-ink); color:var(--brand-ink); }
+  button:disabled { opacity:0.45; cursor:default; }
+  .primary { background:var(--brand-ink); border-color:var(--brand-ink); color:#fff; font-weight:600; }
+  .primary:hover:not(:disabled) { background:var(--brand-dark); border-color:var(--brand-dark); color:#fff; }
   .row { display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; margin:0.7rem 0; }
-  .runs { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:0.5rem; }
-  .run { text-align:left; position:relative; padding:0.55rem 0.7rem; border-radius:8px; }
-  .run.sel { border-color:#3b82f6; background:#1e2a45; }
-  .run .ord { position:absolute; top:0.4rem; right:0.6rem; color:#3b82f6; font-weight:700; font-size:0.8rem; }
-  .run .meta { color:#64748b; font-size:0.78rem; display:block; }
+  .runs { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:0.55rem; }
+  .run { text-align:left; position:relative; padding:0.6rem 0.75rem; border-radius:8px;
+         background:var(--surface); border:1px solid var(--line); }
+  .run:hover { border-color:var(--brand); color:var(--ink); }
+  .run.sel { border-color:var(--brand); box-shadow:0 0 0 1px var(--brand);
+             background:var(--brand-soft); }
+  .run .ord { position:absolute; top:0.45rem; right:0.6rem; color:var(--brand-ink);
+              font-weight:700; font-size:0.8rem; }
+  .run .meta { color:var(--muted); font-size:0.78rem; display:block; margin-top:0.1rem; }
   table { border-collapse:collapse; width:100%; font-size:0.85rem; margin-top:0.6rem; }
-  th, td { border-bottom:1px solid #2d3748; padding:0.45rem 0.7rem; text-align:left; vertical-align:top; }
-  .proc { font-family:ui-monospace,monospace; color:#cbd5e1; }
-  .t { font-weight:600; margin-right:0.35rem; } .rss { color:#64748b; font-size:0.78rem; display:block; }
-  .d { font-size:0.78rem; color:#64748b; } .worse { color:#f87171; font-weight:600; } .better { color:#4ade80; font-weight:600; }
-  .note { color:#64748b; font-size:0.8rem; }
-  .err { color:#f87171; }
-  #answer { background:#1a1f2b; border:1px solid #2d3748; border-radius:8px; padding:0.8rem 1rem;
-            white-space:pre-wrap; margin-top:0.7rem; display:none; }
+  th { border-bottom:2px solid var(--line); color:var(--ink-2); font-weight:600; }
+  th, td { border-bottom:1px solid var(--line-soft); padding:0.45rem 0.7rem;
+           text-align:left; vertical-align:top; }
+  tr:hover td { background:var(--panel); }
+  .proc { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; color:var(--ink-2); }
+  .t { font-weight:600; margin-right:0.35rem; }
+  .rss { color:var(--muted); font-size:0.78rem; display:block; }
+  .d { font-size:0.78rem; color:var(--muted); }
+  .worse { color:var(--worse); font-weight:600; } .better { color:var(--better); font-weight:600; }
+  .note { color:var(--muted); font-size:0.8rem; }
+  .err { color:var(--worse); }
+  #answer { background:var(--panel); border:1px solid var(--line); border-radius:8px;
+            padding:0.8rem 1rem; white-space:pre-wrap; margin-top:0.7rem; display:none; }
   #ask-q { flex:1; min-width:260px; }
 </style></head><body>
-<h1>nf-runinsights <small>cross-run benchmarks</small></h1>
-<p class="note">History: <span id="store"></span></p>
+<header>
+  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+    <path d="M4 4l8 8-8 8" stroke="#0dc09d" stroke-width="3.2" fill="none"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M12 4l8 8-8 8" stroke="#0b7d63" stroke-width="3.2" fill="none"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <h1>nf-runinsights <small>cross-run benchmarks</small></h1>
+  <span class="store" id="store" title="history store"></span>
+</header>
 
 <h2>Runs</h2>
 <div class="row">
@@ -122,7 +158,13 @@ function renderRuns(){
   }
   $("cmp").disabled = sel.length<2;
   $("cmp").textContent = "Compare"+(sel.length?" "+sel.length:"");
+  syncUrl();
 }
+
+// selection lives in the URL (?runs=a,b), so comparisons are shareable links
+function syncUrl(){ const u=new URL(location);
+  if(sel.length) u.searchParams.set("runs",sel.join(",")); else u.searchParams.delete("runs");
+  history.replaceState(null,"",u); }
 
 function lastN(n){ sel = visible().slice(-n).map(r=>r.run_name); $("result").innerHTML=""; renderRuns(); }
 function clearSel(){ sel=[]; $("result").innerHTML=""; renderRuns(); }
@@ -175,7 +217,12 @@ async function init(){
   $("pipeline").innerHTML=pipes.map(p=>`<option>${p}</option>`).join("");
   if(pipes.length) $("pipeline").value=all.length?all[all.length-1].pipeline:pipes[0];
   $("pipeline").onchange=()=>{ sel=[]; $("result").innerHTML=""; renderRuns(); };
+  const q=new URLSearchParams(location.search).get("runs");
+  if(q){ sel=q.split(",").filter(n=>all.some(r=>r.run_name===n));
+    const first=all.find(r=>r.run_name===sel[0]);
+    if(first) $("pipeline").value=first.pipeline; }
   renderRuns();
+  if(sel.length>=2) doCompare();
 }
 init();
 </script></body></html>

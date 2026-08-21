@@ -9,6 +9,8 @@ pipeline-wide slowdowns.
 Nextflow's built-in reports tell you everything about one run. nf-runinsights
 tells you how this run compares to every run before it.
 
+![The nf-runinsights dashboard comparing two nf-core/sarek runs](docs/dashboard.png)
+
 ## Why not the built-in tools
 
 | Tool | Gives you | Limit |
@@ -248,9 +250,8 @@ cd test-pipeline && nextflow run main.nf --slow   # trigger a regression
 ```
 
 The Python readers live in `nf_runinsights/` and ship to PyPI as
-`nf-runinsights-dashboard`, released by tagging `pypi-v<version>` after
-bumping `pyproject.toml`. The plugin releases independently via
-`plugin-v<version>` tags and the version in `build.gradle`.
+`nf-runinsights-dashboard`; the plugin ships to the Nextflow plugin
+registry. Both release via tags, see [RELEASE.md](RELEASE.md).
 
 ## License
 
