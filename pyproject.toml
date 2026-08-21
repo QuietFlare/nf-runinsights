@@ -24,6 +24,7 @@ dependencies = []
 mcp = ["mcp"]
 ask = ["anthropic"]
 s3 = ["fsspec", "s3fs"]
+all = ["mcp", "anthropic", "fsspec", "s3fs"]
 test = ["pytest"]
 
 [project.scripts]

@@ -148,6 +148,17 @@ Credentials come from the usual AWS environment; S3-compatible stores
 (MinIO etc.) work via `AWS_ENDPOINT_URL`. Local directories never touch
 fsspec, so the base install stays stdlib-only.
 
+## Python readers
+
+The dashboard and MCP server ship to PyPI as one package. Pick a row:
+
+| You want | Command |
+|---|---|
+| Dashboard, local store | `pipx run nf-runinsights-dashboard` |
+| Dashboard on S3 | `pipx run --spec 'nf-runinsights-dashboard[s3]' nf-runinsights-dashboard --history s3://bucket/prefix` |
+| MCP server | `pipx install 'nf-runinsights-dashboard[mcp]'` |
+| Everything, decide later | `pipx install 'nf-runinsights-dashboard[all]'` |
+
 ## Dashboard
 
 A local web UI over the store. Python standard library only:

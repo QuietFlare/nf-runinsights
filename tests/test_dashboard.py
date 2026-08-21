@@ -91,6 +91,24 @@ def test_api_ask_rejects_empty_question(server, history):
     assert "error" in data
 
 
+def test_port_in_use_is_a_sentence_not_a_traceback(history, monkeypatch):
+    import socket
+    import sys as _sys
+    from nf_runinsights.dashboard import main
+    blocker = socket.socket()
+    blocker.bind(("127.0.0.1", 0))
+    port = blocker.getsockname()[1]
+    blocker.listen(1)
+    try:
+        monkeypatch.setattr(_sys, "argv", ["nf-runinsights-dashboard",
+                                           "--port", str(port)])
+        with pytest.raises(SystemExit) as exc:
+            main()
+        assert "already in use" in str(exc.value)
+    finally:
+        blocker.close()
+
+
 def test_api_ask_without_credentials_is_5xx_error(server, make_run, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     make_run("a", "2026-01-01T10:00:00")

@@ -255,7 +255,16 @@ def main() -> None:
         store.load_history()   # fail fast on unreadable or misconfigured stores
     except Exception as e:
         sys.exit(f"cannot read history store {store.HISTORY_DIR}: {e}")
-    server = ThreadingHTTPServer((args.host, args.port), Handler)
+    try:
+        server = ThreadingHTTPServer((args.host, args.port), Handler)
+    except OSError as e:
+        if e.errno in (48, 98):   # EADDRINUSE on macOS / Linux
+            sys.exit(
+                f"port {args.port} is already in use, is another dashboard "
+                f"running? (http://{args.host}:{args.port}) Use --port to "
+                "pick a different one."
+            )
+        raise
     print(f"nf-runinsights dashboard: http://{args.host}:{args.port}")
     print(f"history store: {store.HISTORY_DIR}")
     try:
