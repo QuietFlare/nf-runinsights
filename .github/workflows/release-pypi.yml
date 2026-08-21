@@ -1,0 +1,61 @@
+# Releases the Python readers (dashboard + MCP server) to PyPI as
+# nf-runinsights-dashboard on every v* tag, via PyPI trusted publishing:
+# no token secret needed. One-time setup on pypi.org under
+# "Publishing" (add a publisher, or a pending publisher before the first
+# release): repository QuietFlare/nf-runinsights, workflow
+# release-pypi.yml, environment pypi.
+name: release dashboard to PyPI
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check tag matches pyproject.toml version
+        if: github.ref_type == 'tag'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)
+          if [ "$tag" != "$version" ]; then
+            echo "tag v$tag does not match pyproject.toml version $version" >&2
+            exit 1
+          fi
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install build
+          python -m build
+
+      - name: Smoke-test the wheel
+        run: |
+          python -m pip install dist/*.whl
+          nf-runinsights-mcp --selftest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # OIDC for PyPI trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
