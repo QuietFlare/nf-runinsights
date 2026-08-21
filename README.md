@@ -136,6 +136,18 @@ Nextflow config). The dashboard and MCP server decide where they read:
 `~/.nf-runinsights/history`. For a shared team history, point all three
 at the same directory.
 
+The readers also accept URLs (`--history s3://bucket/prefix`, or anything
+fsspec understands) with the `[s3]` extra installed:
+
+```bash
+pipx run --spec 'nf-runinsights-dashboard[s3]' nf-runinsights-dashboard \
+    --history s3://bucket/prefix
+```
+
+Credentials come from the usual AWS environment; S3-compatible stores
+(MinIO etc.) work via `AWS_ENDPOINT_URL`. Local directories never touch
+fsspec, so the base install stays stdlib-only.
+
 ## Dashboard
 
 A local web UI over the store. Python standard library only:
@@ -225,8 +237,9 @@ cd test-pipeline && nextflow run main.nf --slow   # trigger a regression
 ```
 
 The Python readers live in `nf_runinsights/` and ship to PyPI as
-`nf-runinsights-dashboard` (`python3 -m build`, then twine upload). Keep
-its version in `pyproject.toml` in step with the plugin version.
+`nf-runinsights-dashboard`, released by tagging `pypi-v<version>` after
+bumping `pyproject.toml`. The plugin releases independently via
+`plugin-v<version>` tags and the version in `build.gradle`.
 
 ## License
 

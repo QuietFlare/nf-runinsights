@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nf-runinsights-dashboard"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local dashboard and MCP server for the nf-runinsights Nextflow plugin's run history store"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -23,6 +23,7 @@ dependencies = []
 [project.optional-dependencies]
 mcp = ["mcp"]
 ask = ["anthropic"]
+s3 = ["fsspec", "s3fs"]
 test = ["pytest"]
 
 [project.scripts]

@@ -7,6 +7,10 @@ identically everywhere and are maintained in one place.
 
 Store resolution: set_history() (from a --history flag) >
 NF_RUNINSIGHTS_HISTORY env > ~/.nf-runinsights/history (the plugin's default).
+
+The store may also be a URL (s3://bucket/prefix, or anything fsspec
+understands); that needs the fsspec package, installed by the [s3] extra.
+Local paths never touch fsspec, so the base install stays stdlib-only.
 """
 
 from __future__ import annotations
@@ -16,39 +20,82 @@ import os
 from pathlib import Path
 from statistics import median
 
-HISTORY_DIR = Path(
+
+def _resolve(path: str):
+    """Local paths become Path; URLs stay strings (Path mangles '//')."""
+    return path if "://" in path else Path(path)
+
+
+HISTORY_DIR = _resolve(
     os.environ.get(
         "NF_RUNINSIGHTS_HISTORY", str(Path.home() / ".nf-runinsights" / "history")
     )
 )
-LEGACY_FILE = HISTORY_DIR.parent / "history.jsonl"
 
 ASK_MODEL = os.environ.get("NF_RUNINSIGHTS_ASK_MODEL", "claude-haiku-4-5-20251001")
+
+
+def _legacy_file(hist):
+    """history.jsonl (pre-0.1 plugin) lives next to the history dir."""
+    if isinstance(hist, Path):
+        return hist.parent / "history.jsonl"
+    return hist.rstrip("/").rsplit("/", 1)[0] + "/history.jsonl"
+
+
+LEGACY_FILE = _legacy_file(HISTORY_DIR)
 
 
 def set_history(path: str) -> None:
     """Point the store somewhere else (e.g. from a --history flag)."""
     global HISTORY_DIR, LEGACY_FILE
-    HISTORY_DIR = Path(path)
-    LEGACY_FILE = HISTORY_DIR.parent / "history.jsonl"
+    HISTORY_DIR = _resolve(path)
+    LEGACY_FILE = _legacy_file(HISTORY_DIR)
+
+
+def _url_fs():
+    """fsspec filesystem + root path for a URL store."""
+    try:
+        from fsspec.core import url_to_fs
+    except ImportError:
+        raise RuntimeError(
+            f"reading {HISTORY_DIR} needs the fsspec package: "
+            "pip install 'nf-runinsights-dashboard[s3]' "
+            "(local directories work without it)"
+        )
+    return url_to_fs(str(HISTORY_DIR))
+
+
+def _parse_legacy(text: str, entries: list) -> None:
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entries.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
 
 
 def load_history() -> list[dict]:
     """All recorded runs, oldest first. Corrupt entries are skipped."""
-    entries = []
-    if LEGACY_FILE.exists():
-        for line in LEGACY_FILE.read_text().splitlines():
-            line = line.strip()
-            if not line:
-                continue
+    entries: list[dict] = []
+    if isinstance(HISTORY_DIR, Path):
+        if LEGACY_FILE.exists():
+            _parse_legacy(LEGACY_FILE.read_text(), entries)
+        if HISTORY_DIR.is_dir():
+            for f in sorted(HISTORY_DIR.glob("*.json")):
+                try:
+                    entries.append(json.loads(f.read_text()))
+                except (json.JSONDecodeError, OSError):
+                    continue
+    else:
+        fs, root = _url_fs()
+        legacy = LEGACY_FILE.split("://", 1)[-1]
+        if fs.exists(legacy):
+            _parse_legacy(fs.cat_file(legacy).decode(), entries)
+        for f in sorted(fs.glob(root.rstrip("/") + "/*.json")):
             try:
-                entries.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-    if HISTORY_DIR.is_dir():
-        for f in sorted(HISTORY_DIR.glob("*.json")):
-            try:
-                entries.append(json.loads(f.read_text()))
+                entries.append(json.loads(fs.cat_file(f)))
             except (json.JSONDecodeError, OSError):
                 continue
     entries.sort(key=lambda e: e.get("ts") or "")

@@ -245,12 +245,16 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument(
         "--history",
-        help="history store directory (default: NF_RUNINSIGHTS_HISTORY env, "
-        "then ~/.nf-runinsights/history)",
+        help="history store directory or URL, e.g. s3://bucket/prefix "
+        "(default: NF_RUNINSIGHTS_HISTORY env, then ~/.nf-runinsights/history)",
     )
     args = parser.parse_args()
     if args.history:
         store.set_history(args.history)
+    try:
+        store.load_history()   # fail fast on unreadable or misconfigured stores
+    except Exception as e:
+        sys.exit(f"cannot read history store {store.HISTORY_DIR}: {e}")
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"nf-runinsights dashboard: http://{args.host}:{args.port}")
     print(f"history store: {store.HISTORY_DIR}")

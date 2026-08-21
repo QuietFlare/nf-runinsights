@@ -70,7 +70,9 @@ def build_server():
 
 
 def selftest() -> None:
-    print(f"history dir: {store.HISTORY_DIR} (exists: {store.HISTORY_DIR.is_dir()})")
+    d = store.HISTORY_DIR
+    note = f"exists: {d.is_dir()}" if hasattr(d, "is_dir") else "remote"
+    print(f"history dir: {d} ({note})")
     runs = store.runs_summary()
     print(f"\nlist_runs → {len(runs)} run(s)")
     for r in runs:

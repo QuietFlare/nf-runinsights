@@ -29,7 +29,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install '.[test,mcp]'
+      - run: python -m pip install '.[test,mcp,s3]' 'moto[server]'
         if: matrix.python-version != '3.9'
       - run: python -m pip install '.[test]'   # mcp SDK needs >= 3.10
         if: matrix.python-version == '3.9'
