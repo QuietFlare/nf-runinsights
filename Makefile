@@ -12,6 +12,10 @@ clean:
 test:
 	./gradlew test
 
+# Run Python reader tests (needs: pip install pytest)
+test-py:
+	python3 -m pytest -q
+
 # Install the plugin into local nextflow plugins dir
 install:
 	./gradlew install

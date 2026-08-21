@@ -23,6 +23,7 @@ dependencies = []
 [project.optional-dependencies]
 mcp = ["mcp"]
 ask = ["anthropic"]
+test = ["pytest"]
 
 [project.scripts]
 nf-runinsights-dashboard = "nf_runinsights.dashboard:main"
@@ -36,4 +37,8 @@ Issues = "https://github.com/QuietFlare/nf-runinsights/issues"
 packages = ["nf_runinsights"]
 
 [tool.hatch.build.targets.sdist]
-include = ["nf_runinsights", "README.md", "COPYING"]
+include = ["nf_runinsights", "tests", "README.md", "COPYING"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

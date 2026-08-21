@@ -217,7 +217,8 @@ leaves the deterministic report untouched.
 ## Development
 
 ```bash
-make test        # unit tests
+make test        # plugin unit tests
+make test-py     # Python reader tests (needs: pip install pytest)
 make install     # build and install into ~/.nextflow/plugins
 cd test-pipeline && nextflow run main.nf          # record a baseline
 cd test-pipeline && nextflow run main.nf --slow   # trigger a regression

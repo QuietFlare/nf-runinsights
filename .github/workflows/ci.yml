@@ -1,0 +1,36 @@
+# Tests on every push and PR: the Groovy plugin engine and the Python
+# readers (store, dashboard API, MCP server).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew test
+
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install '.[test,mcp]'
+        if: matrix.python-version != '3.9'
+      - run: python -m pip install '.[test]'   # mcp SDK needs >= 3.10
+        if: matrix.python-version == '3.9'
+      - run: python -m pytest -q
