@@ -130,6 +130,12 @@ storage. Paths resolve through Nextflow's filesystem layer, so
 A `history.jsonl` file from earlier plugin versions is still read,
 never written.
 
+The plugin decides where runs are written (`runinsights.history` in the
+Nextflow config). The dashboard and MCP server decide where they read:
+`--history` flag (dashboard only) > `NF_RUNINSIGHTS_HISTORY` env >
+`~/.nf-runinsights/history`. For a shared team history, point all three
+at the same directory.
+
 ## Dashboard
 
 A local web UI over the store. Python standard library only:
@@ -141,6 +147,8 @@ pipx run nf-runinsights-dashboard   # http://localhost:8765
 ```bash
 pipx run nf-runinsights-dashboard --history /shared/team/runinsights
 ```
+
+The page header shows which store it is reading.
 
 From a repo checkout the old door still works, no install at all:
 
@@ -168,6 +176,15 @@ claude mcp add --scope user nf-runinsights -- ~/.local/bin/nf-runinsights-mcp
 Use the absolute path: MCP clients spawn servers without your shell PATH.
 (From a repo checkout, `pip install mcp` and pointing the client at an
 absolute `python3` plus `mcp-server/server.py` still works.)
+
+The server has no `--history` flag; for a non-default store, register it
+with the environment variable:
+
+```bash
+claude mcp add --scope user nf-runinsights \
+    --env NF_RUNINSIGHTS_HISTORY=/shared/team/runinsights \
+    -- ~/.local/bin/nf-runinsights-mcp
+```
 
 Tools: `list_runs`, `get_run`, `compare_runs`, `get_process_trend`. Then ask
 your assistant things like "compare my last two sarek runs" or "why was last
