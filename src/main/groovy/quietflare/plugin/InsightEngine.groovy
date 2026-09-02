@@ -15,6 +15,8 @@
  */
 package quietflare.plugin
 
+import java.nio.file.Path
+
 /**
  * Pure logic for nf-runinsights: aggregates per-task metrics into
  * per-process summaries, compares a run against history, and renders
@@ -26,6 +28,19 @@ class InsightEngine {
     // a change must be at least this big (ms) before we call it a
     // regression/improvement, so sub-second jitter never triggers flags
     static final long MIN_DELTA_MS = 2000
+
+    /**
+     * What a run is filed under. Registered pipelines keep their project
+     * name (nf-core/sarek). A local script is keyed by directory and file
+     * name (rnaseq/main.nf), so unrelated main.nf scripts no longer share
+     * one history.
+     */
+    static String pipelineId(String repository, String projectName, String scriptName, Path projectDir) {
+        if( repository && projectName ) return projectName
+        String script = scriptName ?: projectName ?: 'unknown'
+        String dir = projectDir?.fileName?.toString()
+        return dir ? "${dir}/${script}" : script
+    }
 
     static BigDecimal median(List values) {
         def nums = (values ?: []).findAll { it != null }.collect { it as BigDecimal }

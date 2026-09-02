@@ -45,7 +45,7 @@ Enable the plugin in your config:
 
 ```groovy
 plugins {
-    id 'nf-runinsights@0.1.0'
+    id 'nf-runinsights@0.2.0'
 }
 ```
 
@@ -254,9 +254,11 @@ leaves the deterministic report untouched.
   opt in (`includeFailed` in the plugin config, `include_failed` on the MCP
   tool, the checkbox in the dashboard). Runs recorded before plugin 0.2
   carry no status and count as completed.
-- Local scripts are identified by filename, so two different pipelines both
-  named `main.nf` share a history. Registered pipelines such as
-  `nf-core/sarek` are unambiguous.
+- Local scripts are filed under directory and file name, as in
+  `rnaseq/main.nf`. Runs recorded before plugin 0.2 sit under the bare
+  `main.nf` and stay readable, but form a separate history. Two projects
+  whose directories share a name still collide. Registered pipelines such
+  as `nf-core/sarek` are unambiguous.
 
 ## Development
 

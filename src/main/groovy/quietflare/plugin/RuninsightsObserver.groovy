@@ -121,7 +121,8 @@ class RuninsightsObserver implements TraceObserver {
         }
 
         def meta = session?.workflowMetadata
-        String pipeline = meta?.projectName ?: meta?.scriptName ?: 'unknown'
+        String pipeline = InsightEngine.pipelineId(
+            meta?.repository, meta?.projectName, meta?.scriptName, meta?.projectDir as Path)
 
         // A crashed run with 3 of 21 processes would drag every median
         // down, so readers leave failed runs out of baselines by default.
