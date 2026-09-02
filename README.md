@@ -140,7 +140,7 @@ That file sits next to the history directory, not inside it, so `ls` or
 `aws s3 cp` on the directory alone misses those runs. Fold them in once:
 
 ```bash
-nf-runinsights-dashboard --migrate-legacy
+nf-runinsights --migrate-legacy
 ```
 
 This writes each legacy run as its own file in the history directory and
@@ -157,7 +157,7 @@ The readers also accept URLs (`--history s3://bucket/prefix`, or anything
 fsspec understands) with the `[s3]` extra installed:
 
 ```bash
-pipx run --spec 'nf-runinsights-dashboard[s3]' nf-runinsights-dashboard \
+pipx run --spec 'nf-runinsights[s3]' nf-runinsights \
     --history s3://bucket/prefix
 ```
 
@@ -167,25 +167,31 @@ fsspec, so the base install stays stdlib-only.
 
 ## Python readers
 
-The dashboard and MCP server ship to PyPI as one package. Pick a row:
+The dashboard and MCP server ship to PyPI as one package, `nf-runinsights`.
+Pick a row:
 
 | You want | Command |
 |---|---|
-| Dashboard, local store | `pipx run nf-runinsights-dashboard` |
-| Dashboard on S3 | `pipx run --spec 'nf-runinsights-dashboard[s3]' nf-runinsights-dashboard --history s3://bucket/prefix` |
-| MCP server | `pipx install 'nf-runinsights-dashboard[mcp]'` |
-| Everything, decide later | `pipx install 'nf-runinsights-dashboard[all]'` |
+| Dashboard, local store | `pipx run nf-runinsights` |
+| Dashboard on S3 | `pipx run --spec 'nf-runinsights[s3]' nf-runinsights --history s3://bucket/prefix` |
+| MCP server | `pipx install 'nf-runinsights[mcp]'` |
+| Everything, decide later | `pipx install 'nf-runinsights[all]'` |
+
+Before 0.3 the package was called `nf-runinsights-dashboard`. That name
+still installs, as a shim that depends on this package, and goes away
+after 0.4. Switch with `pipx uninstall nf-runinsights-dashboard` and
+`pipx install nf-runinsights`.
 
 ## Dashboard
 
 A local web UI over the store. Python standard library only:
 
 ```bash
-pipx run nf-runinsights-dashboard   # http://localhost:8765
+pipx run nf-runinsights   # http://localhost:8765
 ```
 
 ```bash
-pipx run nf-runinsights-dashboard --history /shared/team/runinsights
+pipx run nf-runinsights --history /shared/team/runinsights
 ```
 
 The page header shows which store it is reading. Failed runs are hidden
@@ -200,7 +206,7 @@ python3 dashboard/app.py
 
 Pick runs, compare them side by side with deltas against a baseline, and
 optionally ask free-form questions. Ask needs the `anthropic` package
-(`pipx run --spec 'nf-runinsights-dashboard[ask]' nf-runinsights-dashboard`,
+(`pipx run --spec 'nf-runinsights[ask]' nf-runinsights`,
 or `pip install anthropic` from a checkout) and `ANTHROPIC_API_KEY`;
 everything else works without them.
 
@@ -211,7 +217,7 @@ Gemini CLI, or an OpenAI agent. The server is read-only and contains no AI;
 the assistant that connects to it supplies the model.
 
 ```bash
-pipx install 'nf-runinsights-dashboard[mcp]'
+pipx install 'nf-runinsights[mcp]'
 claude mcp add --scope user nf-runinsights -- ~/.local/bin/nf-runinsights-mcp
 ```
 
@@ -271,8 +277,7 @@ cd test-pipeline && nextflow run main.nf --slow   # trigger a regression
 ```
 
 The Python readers live in `nf_runinsights/` and ship to PyPI as
-`nf-runinsights-dashboard`; the plugin ships to the Nextflow plugin
-registry. Both release via tags, see [RELEASE.md](RELEASE.md).
+`nf-runinsights`; the plugin ships to the Nextflow plugin registry. Both release via tags, see [RELEASE.md](RELEASE.md).
 
 ## License
 

@@ -6,7 +6,7 @@ All data logic lives in the shared module store.py (also used by
 dashboard.py), this file is only the MCP door.
 
 Usage:
-    pipx install 'nf-runinsights-dashboard[mcp]'
+    pipx install 'nf-runinsights[mcp]'
     claude mcp add --scope user nf-runinsights -- ~/.local/bin/nf-runinsights-mcp
     (use the absolute path: MCP clients spawn without your shell PATH)
 
@@ -31,7 +31,7 @@ def build_server():
         except ImportError:
             sys.exit(
                 "the MCP server needs the mcp package: pip install mcp, or "
-                "pipx install 'nf-runinsights-dashboard[mcp]' "
+                "pipx install 'nf-runinsights[mcp]' "
                 "(--selftest works without it)"
             )
 

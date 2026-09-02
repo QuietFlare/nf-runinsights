@@ -67,7 +67,7 @@ def _url_fs():
     except ImportError:
         raise RuntimeError(
             f"reading {HISTORY_DIR} needs the fsspec package: "
-            "pip install 'nf-runinsights-dashboard[s3]' "
+            "pip install 'nf-runinsights[s3]' "
             "(local directories work without it)"
         )
     return url_to_fs(str(HISTORY_DIR))
@@ -312,7 +312,7 @@ def ask(question: str, pipeline: str | None = None, run_names: list[str] | None 
     except ImportError:
         return {
             "error": "Ask needs the anthropic package: pip install anthropic, "
-            "or reinstall as 'nf-runinsights-dashboard[ask]' "
+            "or reinstall as 'nf-runinsights[ask]' "
             "(everything else works without it)"
         }
     if not os.environ.get("ANTHROPIC_API_KEY"):

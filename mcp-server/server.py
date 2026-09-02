@@ -2,7 +2,8 @@
 checkout (and for MCP clients already configured with this path).
 
 The server lives in nf_runinsights/mcp_server.py and is also on PyPI:
-`pipx install 'nf-runinsights-dashboard[mcp]'` gives `nf-runinsights-mcp`.
+`pipx install 'nf-runinsights[mcp]'` gives `nf-runinsights-mcp` (the old
+package name nf-runinsights-dashboard is a shim that depends on it).
 """
 
 import sys

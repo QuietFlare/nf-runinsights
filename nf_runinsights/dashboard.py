@@ -2,11 +2,11 @@
 nf-runinsights dashboard, a zero-dependency local web UI for the run
 history store.
 
-    pipx run nf-runinsights-dashboard                     # http://localhost:8765
+    pipx run nf-runinsights                               # http://localhost:8765
     nf-runinsights-dashboard --history /shared/team/runinsights
     nf-runinsights-dashboard --port 9000
     NF_RUNINSIGHTS_HISTORY=s3-synced/dir nf-runinsights-dashboard
-    nf-runinsights-dashboard --migrate-legacy             # fold history.jsonl into run files
+    nf-runinsights --migrate-legacy                       # fold history.jsonl into run files
     python3 dashboard/app.py                              # from a repo checkout
 
 Store resolution (mirrors the plugin's default so zero config agrees):
