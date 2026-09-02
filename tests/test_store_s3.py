@@ -38,7 +38,10 @@ def s3_history(s3_endpoint, monkeypatch):
     )
     s3fs.S3FileSystem.clear_instance_cache()
     fs = fsspec.filesystem("s3")
-    fs.mkdir(BUCKET)
+    if not fs.exists(BUCKET):
+        fs.mkdir(BUCKET)
+    if fs.exists(f"{BUCKET}/history"):   # the server outlives one test
+        fs.rm(f"{BUCKET}/history", recursive=True)
     orig_dir, orig_legacy = store.HISTORY_DIR, store.LEGACY_FILE
     store.set_history(f"s3://{BUCKET}/history")
     yield fs
@@ -67,3 +70,21 @@ def test_s3_store_end_to_end(s3_history):
     assert result["processes"][0]["runs"][1]["median_ms"] == 3000
     trend = store.process_trend("FOO")
     assert trend["overall_median_ms"] == 2000
+
+
+def test_s3_second_load_does_not_reread(s3_history, monkeypatch):
+    fs = s3_history
+    fs.pipe(f"{BUCKET}/history/a.json",
+            json.dumps(entry("a", "2026-01-01T10:00:00")).encode())
+    store.load_history()
+    reads = []
+    own, _ = store._url_fs()   # s3fs binds sync wrappers per instance
+    real = own.cat_file
+    monkeypatch.setattr(own, "cat_file",
+                        lambda *a, **k: (reads.append(1), real(*a, **k))[1])
+    assert len(store.load_history()) == 1
+    assert reads == []
+    fs.pipe(f"{BUCKET}/history/b.json",
+            json.dumps(entry("b", "2026-01-02T10:00:00")).encode())
+    assert len(store.load_history()) == 2
+    assert len(reads) == 1
