@@ -178,6 +178,10 @@ pipeline history if none selected). Needs ANTHROPIC_API_KEY on the server; read-
 <script>
 let all = [], sel = [];
 const $ = id => document.getElementById(id);
+// Run, pipeline, and process names come from trace files and land in
+// innerHTML. On a shared store one crafted run name would run as script.
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 
 function fmtMs(ms){ if(ms==null) return "–"; const s=ms/1000;
   if(s<60) return s.toFixed(1)+"s"; const m=Math.floor(s/60); return m+"m "+Math.round(s-m*60)+"s"; }
@@ -195,7 +199,7 @@ function renderRuns(){
     const b=document.createElement("button");
     b.className="run"+(i>=0?" sel":"");
     b.innerHTML=(i>=0?`<span class="ord">#${i+1}</span>`:"")+
-      `<strong>${r.run_name}</strong><span class="meta">${fmtTs(r.ts)} · ${r.process_count} processes</span>`;
+      `<strong>${esc(r.run_name)}</strong><span class="meta">${esc(fmtTs(r.ts))} · ${esc(r.process_count)} processes</span>`;
     b.onclick=()=>{ const j=sel.indexOf(r.run_name);
       if(j>=0) sel.splice(j,1); else sel.push(r.run_name);
       $("result").innerHTML=""; renderRuns(); };
@@ -217,12 +221,12 @@ function clearSel(){ sel=[]; $("result").innerHTML=""; renderRuns(); }
 async function doCompare(){
   const res=await fetch("/api/compare?runs="+encodeURIComponent(sel.join(",")));
   const d=await res.json();
-  if(d.error){ $("result").innerHTML=`<p class="err">${d.error}</p>`; return; }
-  let h=`<h2>${d.pipeline}, ${d.runs.length} runs</h2><table><tr><th>Process</th>`;
-  d.runs.forEach((r,i)=>h+=`<th>${r.run_name}<span class="rss">${i? fmtTs(r.ts):"baseline"}</span></th>`);
+  if(d.error){ $("result").innerHTML=`<p class="err">${esc(d.error)}</p>`; return; }
+  let h=`<h2>${esc(d.pipeline)}, ${d.runs.length} runs</h2><table><tr><th>Process</th>`;
+  d.runs.forEach((r,i)=>h+=`<th>${esc(r.run_name)}<span class="rss">${i? esc(fmtTs(r.ts)):"baseline"}</span></th>`);
   h+="</tr>";
   for(const p of d.processes){
-    h+=`<tr><td class="proc" title="${p.process}">${p.process.split(":").pop()}</td>`;
+    h+=`<tr><td class="proc" title="${esc(p.process)}">${esc(p.process.split(":").pop())}</td>`;
     const base=p.runs[0]&&p.runs[0].median_ms;
     p.runs.forEach((c,i)=>{
       if(!c){ h+="<td>–</td>"; return; }
@@ -259,7 +263,7 @@ async function init(){
   const d=await (await fetch("/api/runs")).json();
   all=d.runs; $("store").textContent=d.store;
   const pipes=[...new Set(all.map(r=>r.pipeline))];
-  $("pipeline").innerHTML=pipes.map(p=>`<option>${p}</option>`).join("");
+  $("pipeline").innerHTML=pipes.map(p=>`<option>${esc(p)}</option>`).join("");
   if(pipes.length) $("pipeline").value=all.length?all[all.length-1].pipeline:pipes[0];
   $("pipeline").onchange=()=>{ sel=[]; $("result").innerHTML=""; renderRuns(); };
   const q=new URLSearchParams(location.search).get("runs");

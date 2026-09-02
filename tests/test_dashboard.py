@@ -115,3 +115,39 @@ def test_api_ask_without_credentials_is_5xx_error(server, make_run, monkeypatch)
     status, data = post_json(server + "/api/ask", b'{"question": "why?"}')
     assert status == 503
     assert "error" in data
+
+
+# --- escaping ---------------------------------------------------------------
+
+def _script():
+    from nf_runinsights.dashboard import INDEX_HTML
+    return INDEX_HTML.split("<script>", 1)[1].split("</script>", 1)[0]
+
+
+def test_every_template_hole_is_escaped_or_numeric():
+    """Every ${...} that lands in innerHTML is either esc()-wrapped or one
+    of these expressions, which only ever yield numbers or fixed strings."""
+    import re
+    safe = {
+        "i+1", "d.runs.length", "cls", "delta",
+        'pct>0?"+":""', "pct.toFixed(1)",
+        "fmtMs(c.median_ms)", "fmtB(c.peak_rss)",
+    }
+    holes = re.findall(r"\$\{((?:[^{}]|\{[^{}]*\})*)\}", _script())
+    assert holes, "no template holes found, did the page change shape?"
+    unsafe = [h for h in holes if "esc(" not in h and h not in safe]
+    assert unsafe == []
+
+
+def test_esc_neutralizes_markup():
+    import re
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not installed")
+    src = re.search(r"const esc = .*?;\n", _script(), re.S).group(0)
+    payload = "<img src=x onerror=alert(1)>\"'&"
+    js = f"{src}\nprocess.stdout.write(esc({json.dumps(payload)}));"
+    out = subprocess.run([node, "-e", js], capture_output=True, text=True, check=True).stdout
+    assert out == "&lt;img src=x onerror=alert(1)&gt;&quot;&#39;&amp;"
