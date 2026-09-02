@@ -54,7 +54,9 @@ INDEX_HTML = """<!doctype html>
        reads as a second colour rather than a shade of the first. */
     --brand:#f97415; --brand-soft:#fff4ea;
     --primary:#0f172a; --primary-hover:#1e293b;
-    --worse:#c92a2a; --better:#2b8a3e;
+    /* Rotated away from the accent: hue 344 and 175, not 0 and 130,
+       so a state never reads as a second brand colour. */
+    --worse:#b3123c; --better:#0f766e;
     --sans:"Inter",-apple-system,"Segoe UI",system-ui,Helvetica,Arial,sans-serif;
     --display:"Inter Tight","Inter",-apple-system,"Segoe UI",system-ui,sans-serif;
     --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -125,7 +127,13 @@ INDEX_HTML = """<!doctype html>
   .t { font-weight:600; margin-right:0.35rem; }
   .rss { color:var(--muted); font-size:0.78rem; display:block; }
   .d { font-size:0.78rem; color:var(--muted); }
-  .worse { color:var(--worse); font-weight:600; } .better { color:var(--better); font-weight:600; }
+  /* Direction is a mark, not a colour. The number stays ink so a long
+     table reads as one column and nothing competes with the brand.
+     Glyphs are literal characters: a CSS unicode escape would be read
+     as octal by Python first, since this block is not a raw string. */
+  .worse, .better { color:var(--ink); font-weight:600; }
+  .worse::before { content:"▲ "; color:var(--worse); font-size:0.62rem; }
+  .better::before { content:"▼ "; color:var(--better); font-size:0.62rem; }
   .note { color:var(--muted); font-size:0.8rem; }
   .err { color:var(--worse); }
   #answer { background:var(--panel); border:1px solid var(--line); border-radius:0.5rem;
@@ -221,7 +229,7 @@ async function doCompare(){
       let delta="";
       if(i&&base&&c.median_ms!=null){
         const pct=(c.median_ms-base)/base*100, diff=c.median_ms-base;
-        // colour only when >=10% AND >=2s absolute, sub-second jitter is noise
+        // mark only when >=10% AND >=2s absolute, sub-second jitter is noise
         const cls=(Math.abs(pct)>=10&&Math.abs(diff)>=2000)?(pct>0?"worse":"better"):"";
         delta=` <span class="d ${cls}">${pct>0?"+":""}${pct.toFixed(1)}%</span>`;
       }
@@ -229,7 +237,7 @@ async function doCompare(){
     });
     h+="</tr>";
   }
-  h+=`</table><p class="note">Deltas vs #1 (baseline); coloured only at ±10% and 2s+ absolute change.</p>`;
+  h+=`</table><p class="note">Deltas vs #1 (baseline); marked only at ±10% and 2s+ absolute change.</p>`;
   $("result").innerHTML=h;
 }
 
