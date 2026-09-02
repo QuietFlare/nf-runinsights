@@ -1,8 +1,23 @@
 package quietflare.plugin
 
+import java.nio.file.Paths
+
 import spock.lang.Specification
 
 class InsightEngineTest extends Specification {
+
+    def 'files registered pipelines under their project name'() {
+        expect:
+        InsightEngine.pipelineId('https://github.com/nf-core/sarek', 'nf-core/sarek', 'main.nf',
+            Paths.get('/home/u/.nextflow/assets/nf-core/sarek')) == 'nf-core/sarek'
+    }
+
+    def 'files local scripts under directory and file name'() {
+        expect:
+        InsightEngine.pipelineId(null, 'main.nf', 'main.nf', Paths.get('/work/rnaseq')) == 'rnaseq/main.nf'
+        InsightEngine.pipelineId(null, null, 'main.nf', null) == 'main.nf'
+    }
+
 
     private static Map task(String proc, Long ms, Long rss = null, Long memReq = null, String status = 'COMPLETED') {
         [process: proc, name: "${proc} (1)", status: status,

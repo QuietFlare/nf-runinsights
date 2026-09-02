@@ -51,6 +51,18 @@ class HistoryStoreTest extends Specification {
         loaded*.run_name == ['old_run', 'new_run']
     }
 
+    def 'leaves failed runs out unless asked'() {
+        given:
+        def store = new HistoryStore(tmp.resolve('history'), null)
+        store.save(run('toy', 'old', '2026-08-17T14:00:00+02:00'))
+        store.save(run('toy', 'broken', '2026-08-17T15:00:00+02:00') + [status: 'failed'])
+        store.save(run('toy', 'fine', '2026-08-17T16:00:00+02:00') + [status: 'completed'])
+
+        expect: 'a run without a status predates the field and counts as completed'
+        store.load('toy')*.run_name == ['old', 'fine']
+        store.load('toy', true)*.run_name == ['old', 'broken', 'fine']
+    }
+
     def 'skips unreadable per-run files'() {
         given:
         def store = new HistoryStore(tmp.resolve('history'), null)

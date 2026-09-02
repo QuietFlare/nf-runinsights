@@ -75,3 +75,18 @@ def test_missing_fsspec_explains_the_extra(memfs, monkeypatch):
     monkeypatch.setitem(sys.modules, "fsspec.core", None)
     with pytest.raises(RuntimeError, match=r"\[s3\]"):
         store.load_history()
+
+
+def test_remote_second_load_does_not_reread(memfs, monkeypatch):
+    put(memfs, "a.json", entry("a", "2026-01-01T10:00:00"))
+    put(memfs, "b.json", entry("b", "2026-01-02T10:00:00"))
+    reads = []
+    real = type(memfs).cat_file
+    monkeypatch.setattr(type(memfs), "cat_file",
+                        lambda self, *a, **k: (reads.append(1), real(self, *a, **k))[1])
+    store.load_history()
+    store.load_history()
+    assert len(reads) == 2
+    put(memfs, "c.json", entry("c", "2026-01-03T10:00:00"))
+    assert len(store.load_history()) == 3
+    assert len(reads) == 3

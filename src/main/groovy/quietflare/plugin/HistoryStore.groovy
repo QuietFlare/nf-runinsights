@@ -81,17 +81,24 @@ class HistoryStore {
         Files.writeString(dir.resolve(name), JsonOutput.toJson(runRecord))
     }
 
-    /** All recorded runs of the given pipeline, oldest first. */
-    List<Map> load(String pipeline) {
+    /**
+     * Recorded runs of the given pipeline, oldest first. Failed runs are
+     * left out unless asked for; runs written before the status field
+     * existed count as completed.
+     */
+    List<Map> load(String pipeline, boolean includeFailed = false) {
         def out = []
         def slurper = new JsonSlurper()
+        def wanted = { rec ->
+            rec instanceof Map && rec.pipeline == pipeline && (includeFailed || rec.status != 'failed')
+        }
 
         if( legacyFile != null && Files.exists(legacyFile) ) {
             Files.readAllLines(legacyFile).each { line ->
                 if( !line.trim() ) return
                 try {
                     def rec = slurper.parseText(line)
-                    if( rec instanceof Map && rec.pipeline == pipeline )
+                    if( wanted(rec) )
                         out << rec
                 }
                 catch( Exception ignored ) { }   // one corrupt line never hides the rest
@@ -104,7 +111,7 @@ class HistoryStore {
                     if( !f.fileName.toString().endsWith('.json') ) return
                     try {
                         def rec = slurper.parse(Files.newBufferedReader(f))
-                        if( rec instanceof Map && rec.pipeline == pipeline )
+                        if( wanted(rec) )
                             out << rec
                     }
                     catch( Exception e ) {

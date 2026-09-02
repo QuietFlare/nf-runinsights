@@ -2,10 +2,11 @@
 nf-runinsights dashboard, a zero-dependency local web UI for the run
 history store.
 
-    pipx run nf-runinsights-dashboard                     # http://localhost:8765
+    pipx run nf-runinsights                               # http://localhost:8765
     nf-runinsights-dashboard --history /shared/team/runinsights
     nf-runinsights-dashboard --port 9000
     NF_RUNINSIGHTS_HISTORY=s3-synced/dir nf-runinsights-dashboard
+    nf-runinsights --migrate-legacy                       # fold history.jsonl into run files
     python3 dashboard/app.py                              # from a repo checkout
 
 Store resolution (mirrors the plugin's default so zero config agrees):
@@ -115,6 +116,9 @@ INDEX_HTML = """<!doctype html>
   .run .ord { position:absolute; top:0.45rem; right:0.6rem; color:var(--brand);
               font-weight:700; font-size:0.8rem; }
   .run .meta { color:var(--muted); font-size:0.78rem; display:block; margin-top:0.1rem; }
+  .run .bad { color:var(--worse); font-size:0.72rem; font-weight:600;
+              margin-left:0.45rem; }
+  label.note input { vertical-align:middle; margin:0 0.25rem 0 0.5rem; }
   table { border-collapse:collapse; width:100%; font-size:0.85rem; margin-top:0.6rem; }
   /* No uppercase here: these headers carry run names, and an
      identifier is harder to read shouted. */
@@ -159,6 +163,7 @@ INDEX_HTML = """<!doctype html>
   <button onclick="lastN(3)">Last 3</button>
   <button onclick="clearSel()">Clear</button>
   <button class="primary" id="cmp" onclick="doCompare()" disabled>Compare</button>
+  <label class="note"><input type="checkbox" id="failed" onchange="toggleFailed()">Show failed runs</label>
 </div>
 <div class="runs" id="runs"></div>
 
@@ -178,6 +183,10 @@ pipeline history if none selected). Needs ANTHROPIC_API_KEY on the server; read-
 <script>
 let all = [], sel = [];
 const $ = id => document.getElementById(id);
+// Run, pipeline, and process names come from trace files and land in
+// innerHTML. On a shared store one crafted run name would run as script.
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 
 function fmtMs(ms){ if(ms==null) return "–"; const s=ms/1000;
   if(s<60) return s.toFixed(1)+"s"; const m=Math.floor(s/60); return m+"m "+Math.round(s-m*60)+"s"; }
@@ -186,7 +195,12 @@ function fmtB(b){ if(b==null) return "–"; const u=["B","KB","MB","GB","TB"]; l
 function fmtTs(ts){ if(!ts) return ""; const d=new Date(ts);
   return isNaN(d)?ts.slice(0,16):d.toLocaleString(undefined,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}); }
 
-function visible(){ return all.filter(r=>r.pipeline===$("pipeline").value); }
+// Failed runs stay out of the list, and so out of comparisons, until asked for.
+function visible(){ return all.filter(r=>r.pipeline===$("pipeline").value&&
+  ($("failed").checked||r.status!=="failed")); }
+
+function toggleFailed(){ const shown=visible().map(r=>r.run_name);
+  sel=sel.filter(n=>shown.includes(n)); $("result").innerHTML=""; renderRuns(); }
 
 function renderRuns(){
   const box=$("runs"); box.innerHTML="";
@@ -194,8 +208,9 @@ function renderRuns(){
     const i=sel.indexOf(r.run_name);
     const b=document.createElement("button");
     b.className="run"+(i>=0?" sel":"");
+    const bad=r.status==="failed"?'<span class="bad">failed</span>':"";
     b.innerHTML=(i>=0?`<span class="ord">#${i+1}</span>`:"")+
-      `<strong>${r.run_name}</strong><span class="meta">${fmtTs(r.ts)} · ${r.process_count} processes</span>`;
+      `<strong>${esc(r.run_name)}</strong>${bad}<span class="meta">${esc(fmtTs(r.ts))} · ${esc(r.process_count)} processes</span>`;
     b.onclick=()=>{ const j=sel.indexOf(r.run_name);
       if(j>=0) sel.splice(j,1); else sel.push(r.run_name);
       $("result").innerHTML=""; renderRuns(); };
@@ -217,12 +232,12 @@ function clearSel(){ sel=[]; $("result").innerHTML=""; renderRuns(); }
 async function doCompare(){
   const res=await fetch("/api/compare?runs="+encodeURIComponent(sel.join(",")));
   const d=await res.json();
-  if(d.error){ $("result").innerHTML=`<p class="err">${d.error}</p>`; return; }
-  let h=`<h2>${d.pipeline}, ${d.runs.length} runs</h2><table><tr><th>Process</th>`;
-  d.runs.forEach((r,i)=>h+=`<th>${r.run_name}<span class="rss">${i? fmtTs(r.ts):"baseline"}</span></th>`);
+  if(d.error){ $("result").innerHTML=`<p class="err">${esc(d.error)}</p>`; return; }
+  let h=`<h2>${esc(d.pipeline)}, ${d.runs.length} runs</h2><table><tr><th>Process</th>`;
+  d.runs.forEach((r,i)=>h+=`<th>${esc(r.run_name)}<span class="rss">${i? esc(fmtTs(r.ts)):"baseline"}</span></th>`);
   h+="</tr>";
   for(const p of d.processes){
-    h+=`<tr><td class="proc" title="${p.process}">${p.process.split(":").pop()}</td>`;
+    h+=`<tr><td class="proc" title="${esc(p.process)}">${esc(p.process.split(":").pop())}</td>`;
     const base=p.runs[0]&&p.runs[0].median_ms;
     p.runs.forEach((c,i)=>{
       if(!c){ h+="<td>–</td>"; return; }
@@ -259,13 +274,15 @@ async function init(){
   const d=await (await fetch("/api/runs")).json();
   all=d.runs; $("store").textContent=d.store;
   const pipes=[...new Set(all.map(r=>r.pipeline))];
-  $("pipeline").innerHTML=pipes.map(p=>`<option>${p}</option>`).join("");
+  $("pipeline").innerHTML=pipes.map(p=>`<option>${esc(p)}</option>`).join("");
   if(pipes.length) $("pipeline").value=all.length?all[all.length-1].pipeline:pipes[0];
   $("pipeline").onchange=()=>{ sel=[]; $("result").innerHTML=""; renderRuns(); };
   const q=new URLSearchParams(location.search).get("runs");
   if(q){ sel=q.split(",").filter(n=>all.some(r=>r.run_name===n));
     const first=all.find(r=>r.run_name===sel[0]);
-    if(first) $("pipeline").value=first.pipeline; }
+    if(first) $("pipeline").value=first.pipeline;
+    // a shared link to a failed run should open on it, not on an empty list
+    if(sel.some(n=>all.find(r=>r.run_name===n).status==="failed")) $("failed").checked=true; }
   renderRuns();
   if(sel.length>=2) doCompare();
 }
@@ -341,9 +358,21 @@ def main() -> None:
         help="history store directory or URL, e.g. s3://bucket/prefix "
         "(default: NF_RUNINSIGHTS_HISTORY env, then ~/.nf-runinsights/history)",
     )
+    parser.add_argument(
+        "--migrate-legacy", action="store_true",
+        help="write each run in the pre-0.1 history.jsonl as its own file, "
+        "rename the original, and exit",
+    )
     args = parser.parse_args()
     if args.history:
         store.set_history(args.history)
+    if args.migrate_legacy:
+        try:
+            n = store.migrate_legacy()
+        except (RuntimeError, FileNotFoundError) as e:
+            sys.exit(str(e))
+        print(f"migrated {n} run(s) into {store.HISTORY_DIR}")
+        return
     try:
         store.load_history()   # fail fast on unreadable or misconfigured stores
     except Exception as e:

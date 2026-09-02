@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from nf_runinsights import store
 
 from conftest import proc
@@ -41,6 +43,80 @@ def test_legacy_jsonl_still_read(history, make_run):
     assert [e["run_name"] for e in store.load_history()] == [
         "from_legacy", "from_dir"
     ]
+
+
+def test_migrate_legacy_writes_run_files_and_renames(history):
+    legacy = history.parent / "history.jsonl"
+    legacy.write_text(
+        json.dumps({"run_name": "a", "ts": "2026-01-01T09:00:00+02:00",
+                    "pipeline": "main.nf", "processes": {}}) + "\n"
+        + "not json\n"
+        + json.dumps({"run_name": "b", "ts": "2026-01-02T10:00:00+02:00",
+                      "pipeline": "main.nf", "processes": {}}) + "\n"
+    )
+    store.set_history(str(history))
+    assert store.migrate_legacy() == 2
+    assert not legacy.exists()
+    assert (history.parent / "history.jsonl.migrated").exists()
+    assert sorted(f.name for f in history.glob("*.json")) == [
+        "20260101T090000-a.json", "20260102T100000-b.json"
+    ]
+    assert [e["run_name"] for e in store.load_history()] == ["a", "b"]
+    with pytest.raises(FileNotFoundError):
+        store.migrate_legacy()
+
+
+# --- cache ------------------------------------------------------------------
+
+def count_parses(monkeypatch):
+    """Count json.loads calls, one per file read from disk."""
+    calls = []
+    real = store.json.loads
+    monkeypatch.setattr(store.json, "loads",
+                        lambda *a, **k: (calls.append(1), real(*a, **k))[1])
+    return calls
+
+
+def test_second_load_does_not_reparse_unchanged_files(make_run, monkeypatch):
+    make_run("a", "2026-01-01T10:00:00")
+    make_run("b", "2026-01-02T10:00:00")
+    parses = count_parses(monkeypatch)
+    store.load_history()
+    store.load_history()
+    assert len(parses) == 2
+    make_run("c", "2026-01-03T10:00:00")
+    assert [e["run_name"] for e in store.load_history()] == ["a", "b", "c"]
+    assert len(parses) == 3
+
+
+def test_changed_file_is_read_again(history, make_run, monkeypatch):
+    import os
+    make_run("a", "2026-01-01T10:00:00")
+    store.load_history()
+    parses = count_parses(monkeypatch)
+    f = next(history.glob("*.json"))
+    f.write_text(json.dumps({"run_name": "a", "ts": "2026-01-01T10:00:00",
+                             "pipeline": "changed", "processes": {}}))
+    later = f.stat().st_mtime_ns + 2_000_000_000
+    os.utime(f, ns=(later, later))
+    assert store.load_history()[0]["pipeline"] == "changed"
+    assert len(parses) == 1
+
+
+def test_deleted_file_drops_out(history, make_run):
+    make_run("a", "2026-01-01T10:00:00")
+    make_run("b", "2026-01-02T10:00:00")
+    store.load_history()
+    next(history.glob("*-a.json")).unlink()
+    assert [e["run_name"] for e in store.load_history()] == ["b"]
+
+
+def test_run_detail_reads_only_its_own_file(make_run, monkeypatch):
+    for i in range(5):
+        make_run(f"r{i}", f"2026-01-0{i + 1}T10:00:00")
+    parses = count_parses(monkeypatch)
+    assert store.run_detail("r3")["run_name"] == "r3"
+    assert len(parses) == 1
 
 
 # --- runs_summary / run_detail ---------------------------------------------
@@ -125,6 +201,28 @@ def test_trend_pipeline_filter(make_run):
 def test_trend_unknown_process_is_error(make_run):
     make_run("a", "2026-01-01T10:00:00")
     assert "error" in store.process_trend("GHOST")
+
+
+def test_trend_leaves_failed_runs_out_unless_asked(make_run):
+    make_run("a", "2026-01-01T10:00:00", processes={"FOO": proc(1000)})
+    make_run("b", "2026-01-02T10:00:00", processes={"FOO": proc(9000)},
+             status="failed")
+    make_run("c", "2026-01-03T10:00:00", processes={"FOO": proc(3000)},
+             status="completed")
+    assert store.process_trend("FOO")["overall_median_ms"] == 2000
+    assert store.process_trend("FOO", include_failed=True)["overall_median_ms"] == 3000
+
+
+def test_trend_only_in_failed_runs_says_so(make_run):
+    make_run("b", "2026-01-02T10:00:00", processes={"FOO": proc(9000)},
+             status="failed")
+    assert "failed" in store.process_trend("FOO")["error"]
+
+
+def test_runs_summary_reports_status(make_run):
+    make_run("a", "2026-01-01T10:00:00")
+    make_run("b", "2026-01-02T10:00:00", status="failed")
+    assert [r["status"] for r in store.runs_summary()] == ["completed", "failed"]
 
 
 # --- ask --------------------------------------------------------------------

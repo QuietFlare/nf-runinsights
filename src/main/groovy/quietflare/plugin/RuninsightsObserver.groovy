@@ -38,6 +38,7 @@ import nextflow.trace.TraceRecord
 class RuninsightsObserver implements TraceObserver {
 
     private Session session
+    private volatile boolean flowError = false
     private final List<Map> tasks = Collections.synchronizedList(new ArrayList<Map>())
 
     // File-based heartbeat for debugging: logger output and stdout can both
@@ -64,6 +65,11 @@ class RuninsightsObserver implements TraceObserver {
     void onProcessComplete(TaskHandler handler, TraceRecord trace) {
         if( tasks.isEmpty() ) heartbeat("first task-complete: ${trace.get('name')}")
         tasks << taskRecord(trace)
+    }
+
+    @Override
+    void onFlowError(TaskHandler handler, TraceRecord trace) {
+        flowError = true
     }
 
     // note: cached tasks are deliberately not recorded, they did not
@@ -115,19 +121,26 @@ class RuninsightsObserver implements TraceObserver {
         }
 
         def meta = session?.workflowMetadata
-        String pipeline = meta?.projectName ?: meta?.scriptName ?: 'unknown'
+        String pipeline = InsightEngine.pipelineId(
+            meta?.repository, meta?.projectName, meta?.scriptName, meta?.projectDir as Path)
+
+        // A crashed run with 3 of 21 processes would drag every median
+        // down, so readers leave failed runs out of baselines by default.
+        boolean failedTasks = tasks.any { it.status != 'COMPLETED' }
+        boolean success = !flowError && !failedTasks && session?.isSuccess()
 
         Map runRecord = [
             ts         : java.time.OffsetDateTime.now().toString(),
             run_name   : session?.runName,
             session_id : session?.uniqueId?.toString(),
             pipeline   : pipeline,
+            status     : success ? 'completed' : 'failed',
             processes  : InsightEngine.aggregate(new ArrayList<Map>(tasks)),
         ]
 
         def cfg = (session?.config?.get('runinsights') ?: [:]) as Map
         def store = HistoryStore.resolve(cfg.history as String)
-        List<Map> prior = store.load(pipeline)   // load before saving: current run must not compare to itself
+        List<Map> prior = store.load(pipeline, cfg.includeFailed as boolean)   // load before saving: current run must not compare to itself
         store.save(runRecord)
 
         List<Map> findings = InsightEngine.compare(runRecord.processes as Map, prior)
@@ -139,7 +152,9 @@ class RuninsightsObserver implements TraceObserver {
 
         println ""
         println "nf-runinsights: ${prior.size()} prior run(s) of '${pipeline}' in history"
-        if( !prior )
+        if( !success )
+            println "nf-runinsights: run recorded as failed, later runs will not use it as a baseline"
+        else if( !prior )
             println "nf-runinsights: baseline recorded, comparisons start on your next run"
         findings.each { println "nf-runinsights: ${it.message}" }
         if( prior && !findings )

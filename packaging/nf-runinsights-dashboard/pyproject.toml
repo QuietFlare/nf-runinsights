@@ -1,0 +1,35 @@
+# Shim for the old package name. Depends on nf-runinsights and ships no
+# code of its own, so `pipx run nf-runinsights-dashboard` keeps working
+# for a release or two. Version tracks the canonical package.
+[build-system]
+requires = ["hatchling>=1.19"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nf-runinsights-dashboard"
+version = "0.3.0"
+description = "Renamed to nf-runinsights. This package only depends on it."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = ["nf-runinsights==0.3.0"]
+
+[project.optional-dependencies]
+mcp = ["nf-runinsights[mcp]==0.3.0"]
+ask = ["nf-runinsights[ask]==0.3.0"]
+s3 = ["nf-runinsights[s3]==0.3.0"]
+all = ["nf-runinsights[all]==0.3.0"]
+
+# same entry points, so pipx still finds an app named after the package
+[project.scripts]
+nf-runinsights-dashboard = "nf_runinsights.dashboard:main"
+nf-runinsights-mcp = "nf_runinsights.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/QuietFlare/nf-runinsights"
+
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.hatch.build.targets.sdist]
+include = ["README.md"]
