@@ -50,7 +50,9 @@ INDEX_HTML = """<!doctype html>
     color-scheme: light;
     --ink:#1f2937; --ink-2:#3c4448; --muted:#64748b;
     --surface:#ffffff; --panel:#f1f5f9; --line:#dbe1e9; --line-soft:#eef2f6;
-    --brand:#f97415; --brand-ink:#c2580a; --brand-dark:#9a4708; --brand-soft:#fff4ea;
+    /* One orange. Darkening it for contrast turns it brown, which
+       reads as a second colour rather than a shade of the first. */
+    --brand:#f97415; --brand-soft:#fff4ea;
     --primary:#0f172a; --primary-hover:#1e293b;
     --worse:#c92a2a; --better:#2b8a3e;
     --sans:"Inter",-apple-system,"Segoe UI",system-ui,Helvetica,Arial,sans-serif;
@@ -89,7 +91,7 @@ INDEX_HTML = """<!doctype html>
   button { background:var(--surface); color:var(--ink); border:1px solid #ced4da;
          border-radius:0.5rem; padding:0.4rem 0.8rem; font-size:0.9rem;
          cursor:pointer; }
-  button:hover:not(:disabled) { border-color:var(--brand-ink); color:var(--brand-ink); }
+  button:hover:not(:disabled) { border-color:var(--brand); color:var(--brand); }
   /* Grey out rather than fade the brand: a translucent accent reads
      as a broken control, not a disabled one. */
   button:disabled { background:var(--panel); border-color:var(--line);
@@ -108,7 +110,7 @@ INDEX_HTML = """<!doctype html>
   .run:hover { border-color:var(--brand); color:var(--ink); }
   .run.sel { border-color:var(--brand); box-shadow:0 0 0 1px var(--brand);
              background:var(--brand-soft); }
-  .run .ord { position:absolute; top:0.45rem; right:0.6rem; color:var(--brand-ink);
+  .run .ord { position:absolute; top:0.45rem; right:0.6rem; color:var(--brand);
               font-weight:700; font-size:0.8rem; }
   .run .meta { color:var(--muted); font-size:0.78rem; display:block; margin-top:0.1rem; }
   table { border-collapse:collapse; width:100%; font-size:0.85rem; margin-top:0.6rem; }
