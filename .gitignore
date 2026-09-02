@@ -17,3 +17,4 @@ __pycache__/
 dist/
 *.egg-info/
 test-pipeline/.history.jsonl
+.DS_Store
