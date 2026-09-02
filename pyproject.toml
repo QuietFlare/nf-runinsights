@@ -8,7 +8,7 @@ version = "0.2.1"
 description = "Local dashboard and MCP server for the nf-runinsights Nextflow plugin's run history store"
 readme = "README.md"
 license = { text = "Apache-2.0" }
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = ["nextflow", "pipeline", "benchmarking", "bioinformatics", "mcp"]
 classifiers = [
     "License :: OSI Approved :: Apache Software License",

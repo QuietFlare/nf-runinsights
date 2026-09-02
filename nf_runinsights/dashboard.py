@@ -31,6 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from nf_runinsights import store
+from nf_runinsights.fonts import FACES
 
 
 # ---------------------------------------------------------------------------
@@ -41,71 +42,115 @@ INDEX_HTML = """<!doctype html>
 <html><head><meta charset="utf-8"><title>nf-runinsights</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
+""" + FACES + """
+  /* QuietFlare, copied from the site. Orange is identity and never
+     status: it sits where "warning" normally lives, and a reader should
+     not have to tell the brand apart from a problem. */
   :root {
     color-scheme: light;
-    --ink:#212529; --ink-2:#495057; --muted:#6c757d;
-    --surface:#ffffff; --panel:#f8f9fa; --line:#dee2e6; --line-soft:#e9ecef;
-    --brand:#0dc09d; --brand-ink:#0b7d63; --brand-dark:#096a54; --brand-soft:#e6f9f4;
-    --worse:#c92a2a; --better:#2b8a3e;
+    --ink:#1f2937; --ink-2:#3c4448; --muted:#64748b;
+    --surface:#ffffff; --panel:#f1f5f9; --line:#dbe1e9; --line-soft:#eef2f6;
+    /* One orange. Darkening it for contrast turns it brown, which
+       reads as a second colour rather than a shade of the first. */
+    --brand:#f97415; --brand-soft:#fff4ea;
+    --primary:#0f172a; --primary-hover:#1e293b;
+    /* Rotated away from the accent: hue 344 and 175, not 0 and 130,
+       so a state never reads as a second brand colour. */
+    --worse:#b3123c; --better:#0f766e;
+    --sans:"Inter",-apple-system,"Segoe UI",system-ui,Helvetica,Arial,sans-serif;
+    --display:"Inter Tight","Inter",-apple-system,"Segoe UI",system-ui,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
   }
   * { box-sizing:border-box; }
-  body { background:var(--surface); color:var(--ink); margin:0 auto; max-width:1000px;
-         padding:0 1.25rem 3rem;
-         font:15px/1.55 -apple-system, "Segoe UI", system-ui, Helvetica, Arial, sans-serif; }
-  header { border-top:4px solid var(--brand); border-bottom:1px solid var(--line);
-           margin:0 -1.25rem 1.4rem; padding:1.1rem 1.25rem 0.9rem;
-           display:flex; align-items:baseline; gap:0.6rem; flex-wrap:wrap; }
-  header svg { align-self:center; flex:none; }
-  h1 { font-size:1.35rem; font-weight:700; margin:0; letter-spacing:-0.01em; }
-  h1 small { color:var(--muted); font-weight:400; font-size:0.85rem; margin-left:0.35rem; }
+  body { background:#f8fafc; color:var(--ink); margin:0;
+         font:15px/1.6 var(--sans); -webkit-font-smoothing:antialiased; }
+  main { max-width:64rem; margin:0 auto; padding:0 1.5rem 5rem; }
+
+  /* The masthead the reports open with: accent rule, wordmark, tool. */
+  header { border-top:3px solid var(--brand); background:var(--surface);
+           border-bottom:1px solid var(--line); }
+  .masthead-inner { max-width:64rem; margin:0 auto; padding:1.15rem 1.5rem;
+           display:flex; align-items:baseline; gap:0.75rem; flex-wrap:wrap; }
+  .wordmark { font:700 1.05rem/1 var(--display); letter-spacing:-0.02em;
+           color:var(--ink); }
+  .wordmark b { color:var(--brand); font-weight:700; }
+  .tool { color:var(--muted); font-size:0.88rem; }
   .store { margin-left:auto; color:var(--muted); font-size:0.78rem;
-           font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
-  h2 { font-size:1rem; font-weight:600; color:var(--ink);
-       border-bottom:2px solid var(--line); padding-bottom:0.35rem; margin:1.8rem 0 0.6rem; }
+           font-family:var(--mono); }
+
+  h1 { font-family:var(--display); font-size:2rem; font-weight:800;
+       letter-spacing:-0.03em; margin:2rem 0 0.5rem; }
+  /* Eyebrow headings, as on the site and in both reports. */
+  h2 { font:500 0.78rem/1.4 var(--sans); letter-spacing:0.1em;
+       text-transform:uppercase; color:var(--brand);
+       margin:2.75rem 0 0.85rem; border:0; padding:0; }
+  .panel { background:var(--surface); border:1px solid var(--line);
+       border-radius:0.5rem; padding:1.05rem 1.2rem; margin:0.75rem 0 1.25rem; }
+  .lede { font-size:1.05rem; color:var(--muted); max-width:62ch;
+       margin:0 0 1.5rem; }
   select, input { background:var(--surface); color:var(--ink); border:1px solid #ced4da;
-         border-radius:6px; padding:0.4rem 0.7rem; font-size:0.9rem; }
+         border-radius:0.5rem; padding:0.4rem 0.7rem; font-size:0.9rem; }
   button { background:var(--surface); color:var(--ink); border:1px solid #ced4da;
-         border-radius:6px; padding:0.4rem 0.8rem; font-size:0.9rem; cursor:pointer; }
-  button:hover:not(:disabled) { border-color:var(--brand-ink); color:var(--brand-ink); }
-  button:disabled { opacity:0.45; cursor:default; }
-  .primary { background:var(--brand-ink); border-color:var(--brand-ink); color:#fff; font-weight:600; }
-  .primary:hover:not(:disabled) { background:var(--brand-dark); border-color:var(--brand-dark); color:#fff; }
+         border-radius:0.5rem; padding:0.4rem 0.8rem; font-size:0.9rem;
+         cursor:pointer; }
+  button:hover:not(:disabled) { border-color:var(--brand); color:var(--brand); }
+  /* Grey out rather than fade the brand: a translucent accent reads
+     as a broken control, not a disabled one. */
+  button:disabled { background:var(--panel); border-color:var(--line);
+         color:var(--muted); cursor:default; }
+  /* Near-black, as on the site. Orange is identity, not a control:
+     a page where the brand colour is also the button teaches a
+     reader that orange means "press this". */
+  .primary { background:var(--primary); border-color:var(--primary);
+         color:#fff; font-weight:600; }
+  .primary:hover:not(:disabled) { background:var(--primary-hover);
+         border-color:var(--primary-hover); color:#fff; }
   .row { display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; margin:0.7rem 0; }
   .runs { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:0.55rem; }
-  .run { text-align:left; position:relative; padding:0.6rem 0.75rem; border-radius:8px;
+  .run { text-align:left; position:relative; padding:0.6rem 0.75rem; border-radius:0.5rem;
          background:var(--surface); border:1px solid var(--line); }
   .run:hover { border-color:var(--brand); color:var(--ink); }
   .run.sel { border-color:var(--brand); box-shadow:0 0 0 1px var(--brand);
              background:var(--brand-soft); }
-  .run .ord { position:absolute; top:0.45rem; right:0.6rem; color:var(--brand-ink);
+  .run .ord { position:absolute; top:0.45rem; right:0.6rem; color:var(--brand);
               font-weight:700; font-size:0.8rem; }
   .run .meta { color:var(--muted); font-size:0.78rem; display:block; margin-top:0.1rem; }
   table { border-collapse:collapse; width:100%; font-size:0.85rem; margin-top:0.6rem; }
-  th { border-bottom:2px solid var(--line); color:var(--ink-2); font-weight:600; }
+  /* No uppercase here: these headers carry run names, and an
+     identifier is harder to read shouted. */
+  th { border-bottom:1px solid var(--line); color:var(--muted);
+       font:600 0.76rem/1.5 var(--sans); letter-spacing:0.02em; }
   th, td { border-bottom:1px solid var(--line-soft); padding:0.45rem 0.7rem;
            text-align:left; vertical-align:top; }
   tr:hover td { background:var(--panel); }
-  .proc { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; color:var(--ink-2); }
+  .proc { font-family:var(--mono); color:var(--ink-2); }
   .t { font-weight:600; margin-right:0.35rem; }
   .rss { color:var(--muted); font-size:0.78rem; display:block; }
   .d { font-size:0.78rem; color:var(--muted); }
-  .worse { color:var(--worse); font-weight:600; } .better { color:var(--better); font-weight:600; }
+  /* Direction is a mark, not a colour. The number stays ink so a long
+     table reads as one column and nothing competes with the brand.
+     Glyphs are literal characters: a CSS unicode escape would be read
+     as octal by Python first, since this block is not a raw string. */
+  .worse, .better { color:var(--ink); font-weight:600; }
+  .worse::before { content:"▲ "; color:var(--worse); font-size:0.62rem; }
+  .better::before { content:"▼ "; color:var(--better); font-size:0.62rem; }
   .note { color:var(--muted); font-size:0.8rem; }
   .err { color:var(--worse); }
-  #answer { background:var(--panel); border:1px solid var(--line); border-radius:8px;
+  #answer { background:var(--panel); border:1px solid var(--line); border-radius:0.5rem;
             padding:0.8rem 1rem; white-space:pre-wrap; margin-top:0.7rem; display:none; }
   #ask-q { flex:1; min-width:260px; }
 </style></head><body>
 <header>
-  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-    <path d="M4 4l8 8-8 8" stroke="#0dc09d" stroke-width="3.2" fill="none"
-          stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M12 4l8 8-8 8" stroke="#0b7d63" stroke-width="3.2" fill="none"
-          stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-  <h1>nf-runinsights <small>cross-run benchmarks</small></h1>
-  <span class="store" id="store" title="history store"></span>
+  <div class="masthead-inner">
+    <span class="wordmark">Quiet<b>Flare</b></span>
+    <span class="tool">nf-runinsights</span>
+    <span class="store" id="store" title="history store"></span>
+  </div>
 </header>
+<main>
+  <h1>Cross-run benchmarks</h1>
+  <p class="lede">Every run this store has seen, and what changed between
+  them. Pick two to compare.</p>
 
 <h2>Runs</h2>
 <div class="row">
@@ -184,7 +229,7 @@ async function doCompare(){
       let delta="";
       if(i&&base&&c.median_ms!=null){
         const pct=(c.median_ms-base)/base*100, diff=c.median_ms-base;
-        // colour only when >=10% AND >=2s absolute, sub-second jitter is noise
+        // mark only when >=10% AND >=2s absolute, sub-second jitter is noise
         const cls=(Math.abs(pct)>=10&&Math.abs(diff)>=2000)?(pct>0?"worse":"better"):"";
         delta=` <span class="d ${cls}">${pct>0?"+":""}${pct.toFixed(1)}%</span>`;
       }
@@ -192,7 +237,7 @@ async function doCompare(){
     });
     h+="</tr>";
   }
-  h+=`</table><p class="note">Deltas vs #1 (baseline); coloured only at ±10% and 2s+ absolute change.</p>`;
+  h+=`</table><p class="note">Deltas vs #1 (baseline); marked only at ±10% and 2s+ absolute change.</p>`;
   $("result").innerHTML=h;
 }
 
@@ -225,7 +270,8 @@ async function init(){
   if(sel.length>=2) doCompare();
 }
 init();
-</script></body></html>
+</script></main>
+</body></html>
 """
 
 
