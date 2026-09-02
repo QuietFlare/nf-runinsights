@@ -66,6 +66,59 @@ def test_migrate_legacy_writes_run_files_and_renames(history):
         store.migrate_legacy()
 
 
+# --- cache ------------------------------------------------------------------
+
+def count_parses(monkeypatch):
+    """Count json.loads calls, one per file read from disk."""
+    calls = []
+    real = store.json.loads
+    monkeypatch.setattr(store.json, "loads",
+                        lambda *a, **k: (calls.append(1), real(*a, **k))[1])
+    return calls
+
+
+def test_second_load_does_not_reparse_unchanged_files(make_run, monkeypatch):
+    make_run("a", "2026-01-01T10:00:00")
+    make_run("b", "2026-01-02T10:00:00")
+    parses = count_parses(monkeypatch)
+    store.load_history()
+    store.load_history()
+    assert len(parses) == 2
+    make_run("c", "2026-01-03T10:00:00")
+    assert [e["run_name"] for e in store.load_history()] == ["a", "b", "c"]
+    assert len(parses) == 3
+
+
+def test_changed_file_is_read_again(history, make_run, monkeypatch):
+    import os
+    make_run("a", "2026-01-01T10:00:00")
+    store.load_history()
+    parses = count_parses(monkeypatch)
+    f = next(history.glob("*.json"))
+    f.write_text(json.dumps({"run_name": "a", "ts": "2026-01-01T10:00:00",
+                             "pipeline": "changed", "processes": {}}))
+    later = f.stat().st_mtime_ns + 2_000_000_000
+    os.utime(f, ns=(later, later))
+    assert store.load_history()[0]["pipeline"] == "changed"
+    assert len(parses) == 1
+
+
+def test_deleted_file_drops_out(history, make_run):
+    make_run("a", "2026-01-01T10:00:00")
+    make_run("b", "2026-01-02T10:00:00")
+    store.load_history()
+    next(history.glob("*-a.json")).unlink()
+    assert [e["run_name"] for e in store.load_history()] == ["b"]
+
+
+def test_run_detail_reads_only_its_own_file(make_run, monkeypatch):
+    for i in range(5):
+        make_run(f"r{i}", f"2026-01-0{i + 1}T10:00:00")
+    parses = count_parses(monkeypatch)
+    assert store.run_detail("r3")["run_name"] == "r3"
+    assert len(parses) == 1
+
+
 # --- runs_summary / run_detail ---------------------------------------------
 
 def test_runs_summary_counts_and_filters(make_run):

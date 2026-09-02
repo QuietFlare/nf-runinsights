@@ -11,13 +11,19 @@ NF_RUNINSIGHTS_HISTORY env > ~/.nf-runinsights/history (the plugin's default).
 The store may also be a URL (s3://bucket/prefix, or anything fsspec
 understands); that needs the fsspec package, installed by the [s3] extra.
 Local paths never touch fsspec, so the base install stays stdlib-only.
+
+Parsed run files are cached by path and stamp (mtime and size locally,
+ETag or size remotely). Run files never change once written, so a store
+of hundreds of runs costs one listing per call, not one read per file.
 """
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
+import threading
 from pathlib import Path
 from statistics import median
 
@@ -51,6 +57,7 @@ def set_history(path: str) -> None:
     global HISTORY_DIR, LEGACY_FILE
     HISTORY_DIR = _resolve(path)
     LEGACY_FILE = _legacy_file(HISTORY_DIR)
+    _cache.clear()
 
 
 def _url_fs():
@@ -66,7 +73,8 @@ def _url_fs():
     return url_to_fs(str(HISTORY_DIR))
 
 
-def _parse_legacy(text: str, entries: list) -> None:
+def _parse_legacy(text: str) -> list[dict]:
+    entries = []
     for line in text.splitlines():
         line = line.strip()
         if not line:
@@ -75,30 +83,86 @@ def _parse_legacy(text: str, entries: list) -> None:
             entries.append(json.loads(line))
         except json.JSONDecodeError:
             continue
+    return entries
+
+
+_lock = threading.Lock()
+_cache: dict[str, tuple[object, object]] = {}   # key -> (stamp, parsed or None)
+
+
+def _cached(key, stamp, read):
+    """Parse through the cache. A file is read again only when its stamp moves."""
+    hit = _cache.get(key)
+    if hit is not None and hit[0] == stamp:
+        return hit[1]
+    try:
+        value = read()
+    except (ValueError, OSError):
+        value = None    # corrupt or unreadable: skipped, and not retried until it changes
+    _cache[key] = (stamp, value)
+    return value
+
+
+def _remote_stamp(info: dict):
+    return info.get("ETag") or (
+        info.get("size"),
+        str(info.get("mtime") or info.get("LastModified") or info.get("created")),
+    )
+
+
+def _legacy():
+    """(key, stamp, reader) for history.jsonl, or None when there is none."""
+    if isinstance(HISTORY_DIR, Path):
+        if not LEGACY_FILE.exists():
+            return None
+        st = LEGACY_FILE.stat()
+        return (str(LEGACY_FILE), (st.st_mtime_ns, st.st_size),
+                lambda: _parse_legacy(LEGACY_FILE.read_text()))
+    fs, _ = _url_fs()
+    legacy = LEGACY_FILE.split("://", 1)[-1]
+    if not fs.exists(legacy):
+        return None
+    return (legacy, _remote_stamp(fs.info(legacy)),
+            lambda: _parse_legacy(fs.cat_file(legacy).decode()))
+
+
+def _run_files(pattern: str = "*.json"):
+    """(key, stamp, reader) for each run file matching pattern, in name order."""
+    if isinstance(HISTORY_DIR, Path):
+        if not HISTORY_DIR.is_dir():
+            return
+        for f in sorted(HISTORY_DIR.glob(pattern)):
+            try:
+                st = f.stat()
+            except OSError:
+                continue
+            yield str(f), (st.st_mtime_ns, st.st_size), (lambda f=f: json.loads(f.read_text()))
+        return
+    fs, root = _url_fs()
+    fs.invalidate_cache()   # a long-running dashboard must see runs finished since its last call
+    found = fs.glob(root.rstrip("/") + "/" + pattern, detail=True)
+    for name in sorted(found):
+        if found[name].get("type") == "directory":
+            continue
+        yield name, _remote_stamp(found[name]), (lambda n=name: json.loads(fs.cat_file(n)))
 
 
 def load_history() -> list[dict]:
     """All recorded runs, oldest first. Corrupt entries are skipped."""
     entries: list[dict] = []
-    if isinstance(HISTORY_DIR, Path):
-        if LEGACY_FILE.exists():
-            _parse_legacy(LEGACY_FILE.read_text(), entries)
-        if HISTORY_DIR.is_dir():
-            for f in sorted(HISTORY_DIR.glob("*.json")):
-                try:
-                    entries.append(json.loads(f.read_text()))
-                except (json.JSONDecodeError, OSError):
-                    continue
-    else:
-        fs, root = _url_fs()
-        legacy = LEGACY_FILE.split("://", 1)[-1]
-        if fs.exists(legacy):
-            _parse_legacy(fs.cat_file(legacy).decode(), entries)
-        for f in sorted(fs.glob(root.rstrip("/") + "/*.json")):
-            try:
-                entries.append(json.loads(fs.cat_file(f)))
-            except (json.JSONDecodeError, OSError):
-                continue
+    with _lock:
+        seen = set()
+        legacy = _legacy()
+        if legacy:
+            seen.add(legacy[0])
+            entries.extend(_cached(*legacy) or [])
+        for key, stamp, read in _run_files():
+            seen.add(key)
+            e = _cached(key, stamp, read)
+            if isinstance(e, dict):
+                entries.append(e)
+        for key in [k for k in _cache if k not in seen]:
+            del _cache[key]
     entries.sort(key=lambda e: e.get("ts") or "")
     return entries
 
@@ -111,11 +175,9 @@ def migrate_legacy() -> int:
         )
     if not LEGACY_FILE.exists():
         raise FileNotFoundError(f"no {LEGACY_FILE} to migrate")
-    entries: list[dict] = []
-    _parse_legacy(LEGACY_FILE.read_text(), entries)
     HISTORY_DIR.mkdir(parents=True, exist_ok=True)
     written = 0
-    for e in entries:
+    for e in _parse_legacy(LEGACY_FILE.read_text()):
         # same file name the plugin writes, so old and new runs sort together
         stamp = re.sub(r"[^0-9T]", "", str(e.get("ts") or ""))[:15]
         target = HISTORY_DIR / f"{stamp}-{e.get('run_name') or 'run'}.json"
@@ -147,6 +209,13 @@ def runs_summary(pipeline: str | None = None) -> list[dict]:
 
 
 def run_detail(run_name: str) -> dict | None:
+    """One run by name. Run files carry the name, so those are tried first;
+    legacy runs have no file of their own and fall back to a full load."""
+    with _lock:
+        for key, stamp, read in _run_files(f"*-{glob.escape(run_name)}.json"):
+            e = _cached(key, stamp, read)
+            if isinstance(e, dict) and e.get("run_name") == run_name:
+                return e
     for e in load_history():
         if e.get("run_name") == run_name:
             return e
