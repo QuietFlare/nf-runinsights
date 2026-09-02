@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from statistics import median
 
@@ -100,6 +101,30 @@ def load_history() -> list[dict]:
                 continue
     entries.sort(key=lambda e: e.get("ts") or "")
     return entries
+
+
+def migrate_legacy() -> int:
+    """Split history.jsonl into per-run files and rename it. Local stores only."""
+    if not isinstance(HISTORY_DIR, Path):
+        raise RuntimeError(
+            f"{HISTORY_DIR} is remote: migrate the local copy, then sync it"
+        )
+    if not LEGACY_FILE.exists():
+        raise FileNotFoundError(f"no {LEGACY_FILE} to migrate")
+    entries: list[dict] = []
+    _parse_legacy(LEGACY_FILE.read_text(), entries)
+    HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+    written = 0
+    for e in entries:
+        # same file name the plugin writes, so old and new runs sort together
+        stamp = re.sub(r"[^0-9T]", "", str(e.get("ts") or ""))[:15]
+        target = HISTORY_DIR / f"{stamp}-{e.get('run_name') or 'run'}.json"
+        if target.exists():
+            continue
+        target.write_text(json.dumps(e))
+        written += 1
+    LEGACY_FILE.rename(LEGACY_FILE.with_name("history.jsonl.migrated"))
+    return written
 
 
 def runs_summary(pipeline: str | None = None) -> list[dict]:

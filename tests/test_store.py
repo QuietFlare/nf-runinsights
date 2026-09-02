@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from nf_runinsights import store
 
 from conftest import proc
@@ -41,6 +43,27 @@ def test_legacy_jsonl_still_read(history, make_run):
     assert [e["run_name"] for e in store.load_history()] == [
         "from_legacy", "from_dir"
     ]
+
+
+def test_migrate_legacy_writes_run_files_and_renames(history):
+    legacy = history.parent / "history.jsonl"
+    legacy.write_text(
+        json.dumps({"run_name": "a", "ts": "2026-01-01T09:00:00+02:00",
+                    "pipeline": "main.nf", "processes": {}}) + "\n"
+        + "not json\n"
+        + json.dumps({"run_name": "b", "ts": "2026-01-02T10:00:00+02:00",
+                      "pipeline": "main.nf", "processes": {}}) + "\n"
+    )
+    store.set_history(str(history))
+    assert store.migrate_legacy() == 2
+    assert not legacy.exists()
+    assert (history.parent / "history.jsonl.migrated").exists()
+    assert sorted(f.name for f in history.glob("*.json")) == [
+        "20260101T090000-a.json", "20260102T100000-b.json"
+    ]
+    assert [e["run_name"] for e in store.load_history()] == ["a", "b"]
+    with pytest.raises(FileNotFoundError):
+        store.migrate_legacy()
 
 
 # --- runs_summary / run_detail ---------------------------------------------

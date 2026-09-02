@@ -132,6 +132,17 @@ storage. Paths resolve through Nextflow's filesystem layer, so
 A `history.jsonl` file from earlier plugin versions is still read,
 never written.
 
+That file sits next to the history directory, not inside it, so `ls` or
+`aws s3 cp` on the directory alone misses those runs. Fold them in once:
+
+```bash
+nf-runinsights-dashboard --migrate-legacy
+```
+
+This writes each legacy run as its own file in the history directory and
+renames the original to `history.jsonl.migrated`. Local stores only, so
+migrate before syncing a store to S3.
+
 The plugin decides where runs are written (`runinsights.history` in the
 Nextflow config). The dashboard and MCP server decide where they read:
 `--history` flag (dashboard only) > `NF_RUNINSIGHTS_HISTORY` env >

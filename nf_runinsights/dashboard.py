@@ -6,6 +6,7 @@ history store.
     nf-runinsights-dashboard --history /shared/team/runinsights
     nf-runinsights-dashboard --port 9000
     NF_RUNINSIGHTS_HISTORY=s3-synced/dir nf-runinsights-dashboard
+    nf-runinsights-dashboard --migrate-legacy             # fold history.jsonl into run files
     python3 dashboard/app.py                              # from a repo checkout
 
 Store resolution (mirrors the plugin's default so zero config agrees):
@@ -345,9 +346,21 @@ def main() -> None:
         help="history store directory or URL, e.g. s3://bucket/prefix "
         "(default: NF_RUNINSIGHTS_HISTORY env, then ~/.nf-runinsights/history)",
     )
+    parser.add_argument(
+        "--migrate-legacy", action="store_true",
+        help="write each run in the pre-0.1 history.jsonl as its own file, "
+        "rename the original, and exit",
+    )
     args = parser.parse_args()
     if args.history:
         store.set_history(args.history)
+    if args.migrate_legacy:
+        try:
+            n = store.migrate_legacy()
+        except (RuntimeError, FileNotFoundError) as e:
+            sys.exit(str(e))
+        print(f"migrated {n} run(s) into {store.HISTORY_DIR}")
+        return
     try:
         store.load_history()   # fail fast on unreadable or misconfigured stores
     except Exception as e:
