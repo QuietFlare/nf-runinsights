@@ -127,12 +127,18 @@ def migrate_legacy() -> int:
     return written
 
 
+def is_failed(e: dict) -> bool:
+    """Runs recorded before plugin 0.2 carry no status and count as completed."""
+    return e.get("status") == "failed"
+
+
 def runs_summary(pipeline: str | None = None) -> list[dict]:
     return [
         {
             "run_name": e.get("run_name"),
             "ts": e.get("ts"),
             "pipeline": e.get("pipeline"),
+            "status": e.get("status") or "completed",
             "process_count": len(e.get("processes") or {}),
         }
         for e in load_history()
@@ -180,14 +186,22 @@ def compare(run_names: list[str]) -> dict:
         rows.append({"process": proc, "runs": cells})
     rows.sort(key=lambda r: (r["runs"][0] or {}).get("median_ms") or -1, reverse=True)
     return {
-        "runs": [{"run_name": e.get("run_name"), "ts": e.get("ts")} for e in selected],
+        "runs": [
+            {"run_name": e.get("run_name"), "ts": e.get("ts"),
+             "status": e.get("status") or "completed"}
+            for e in selected
+        ],
         "pipeline": selected[0].get("pipeline"),
         "processes": rows,
     }
 
 
-def process_trend(process: str, pipeline: str | None = None) -> dict:
+def process_trend(
+    process: str, pipeline: str | None = None, include_failed: bool = False
+) -> dict:
+    """One process across runs. Failed runs are left out unless asked for."""
     points = []
+    skipped = 0
     for e in load_history():
         if pipeline is not None and e.get("pipeline") != pipeline:
             continue
@@ -195,11 +209,15 @@ def process_trend(process: str, pipeline: str | None = None) -> dict:
             # match short names too, users say "FASTQC", history says
             # "NFCORE_SAREK:SAREK:FASTQC"
             if name == process or name.rsplit(":", 1)[-1] == process:
+                if is_failed(e) and not include_failed:
+                    skipped += 1
+                    continue
                 points.append(
                     {
                         "run_name": e.get("run_name"),
                         "ts": e.get("ts"),
                         "pipeline": e.get("pipeline"),
+                        "status": e.get("status") or "completed",
                         "median_ms": rec.get("realtime_ms_median"),
                         "peak_rss": rec.get("peak_rss_max"),
                         "queue_ms": rec.get("queue_ms_median"),
@@ -207,7 +225,8 @@ def process_trend(process: str, pipeline: str | None = None) -> dict:
                     }
                 )
     if not points:
-        return {"error": f"no history for process '{process}'"}
+        hint = f", only in {skipped} failed run(s)" if skipped else ""
+        return {"error": f"no history for process '{process}'{hint}"}
     med = [p["median_ms"] for p in points if p["median_ms"] is not None]
     return {
         "process": process,

@@ -20,13 +20,15 @@ def history(tmp_path):
 def make_run(history):
     """Write one run file into the store and return the entry dict."""
 
-    def _make(run_name, ts, pipeline="main.nf", processes=None):
+    def _make(run_name, ts, pipeline="main.nf", processes=None, status=None):
         entry = {
             "run_name": run_name,
             "ts": ts,
             "pipeline": pipeline,
             "processes": processes if processes is not None else {},
         }
+        if status:
+            entry["status"] = status
         (history / f"{ts.replace(':', '')}-{run_name}.json").write_text(
             json.dumps(entry)
         )

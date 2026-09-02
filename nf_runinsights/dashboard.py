@@ -116,6 +116,9 @@ INDEX_HTML = """<!doctype html>
   .run .ord { position:absolute; top:0.45rem; right:0.6rem; color:var(--brand);
               font-weight:700; font-size:0.8rem; }
   .run .meta { color:var(--muted); font-size:0.78rem; display:block; margin-top:0.1rem; }
+  .run .bad { color:var(--worse); font-size:0.72rem; font-weight:600;
+              margin-left:0.45rem; }
+  label.note input { vertical-align:middle; margin:0 0.25rem 0 0.5rem; }
   table { border-collapse:collapse; width:100%; font-size:0.85rem; margin-top:0.6rem; }
   /* No uppercase here: these headers carry run names, and an
      identifier is harder to read shouted. */
@@ -160,6 +163,7 @@ INDEX_HTML = """<!doctype html>
   <button onclick="lastN(3)">Last 3</button>
   <button onclick="clearSel()">Clear</button>
   <button class="primary" id="cmp" onclick="doCompare()" disabled>Compare</button>
+  <label class="note"><input type="checkbox" id="failed" onchange="toggleFailed()">Show failed runs</label>
 </div>
 <div class="runs" id="runs"></div>
 
@@ -191,7 +195,12 @@ function fmtB(b){ if(b==null) return "–"; const u=["B","KB","MB","GB","TB"]; l
 function fmtTs(ts){ if(!ts) return ""; const d=new Date(ts);
   return isNaN(d)?ts.slice(0,16):d.toLocaleString(undefined,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}); }
 
-function visible(){ return all.filter(r=>r.pipeline===$("pipeline").value); }
+// Failed runs stay out of the list, and so out of comparisons, until asked for.
+function visible(){ return all.filter(r=>r.pipeline===$("pipeline").value&&
+  ($("failed").checked||r.status!=="failed")); }
+
+function toggleFailed(){ const shown=visible().map(r=>r.run_name);
+  sel=sel.filter(n=>shown.includes(n)); $("result").innerHTML=""; renderRuns(); }
 
 function renderRuns(){
   const box=$("runs"); box.innerHTML="";
@@ -199,8 +208,9 @@ function renderRuns(){
     const i=sel.indexOf(r.run_name);
     const b=document.createElement("button");
     b.className="run"+(i>=0?" sel":"");
+    const bad=r.status==="failed"?'<span class="bad">failed</span>':"";
     b.innerHTML=(i>=0?`<span class="ord">#${i+1}</span>`:"")+
-      `<strong>${esc(r.run_name)}</strong><span class="meta">${esc(fmtTs(r.ts))} · ${esc(r.process_count)} processes</span>`;
+      `<strong>${esc(r.run_name)}</strong>${bad}<span class="meta">${esc(fmtTs(r.ts))} · ${esc(r.process_count)} processes</span>`;
     b.onclick=()=>{ const j=sel.indexOf(r.run_name);
       if(j>=0) sel.splice(j,1); else sel.push(r.run_name);
       $("result").innerHTML=""; renderRuns(); };
@@ -270,7 +280,9 @@ async function init(){
   const q=new URLSearchParams(location.search).get("runs");
   if(q){ sel=q.split(",").filter(n=>all.some(r=>r.run_name===n));
     const first=all.find(r=>r.run_name===sel[0]);
-    if(first) $("pipeline").value=first.pipeline; }
+    if(first) $("pipeline").value=first.pipeline;
+    // a shared link to a failed run should open on it, not on an empty list
+    if(sel.some(n=>all.find(r=>r.run_name===n).status==="failed")) $("failed").checked=true; }
   renderRuns();
   if(sel.length>=2) doCompare();
 }

@@ -60,6 +60,7 @@ def test_api_runs(server, make_run):
     status, data = get_json(server + "/api/runs")
     assert status == 200
     assert [r["run_name"] for r in data["runs"]] == ["a"]
+    assert data["runs"][0]["status"] == "completed"
     assert data["store"]  # the resolved history path is reported
 
 
@@ -129,7 +130,7 @@ def test_every_template_hole_is_escaped_or_numeric():
     of these expressions, which only ever yield numbers or fixed strings."""
     import re
     safe = {
-        "i+1", "d.runs.length", "cls", "delta",
+        "i+1", "d.runs.length", "cls", "delta", "bad",
         'pct>0?"+":""', "pct.toFixed(1)",
         "fmtMs(c.median_ms)", "fmtB(c.peak_rss)",
     }

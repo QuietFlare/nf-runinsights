@@ -73,6 +73,9 @@ runinsights {
     // contributes to one history. No server required.
     history = '/shared/projects/my-team/runinsights'
 
+    // count failed runs toward baselines (default: false)
+    includeFailed = true
+
     // optional AI narration of the report, off by default
     ai {
         enabled = true
@@ -83,7 +86,8 @@ runinsights {
 
 ## What is recorded
 
-One JSON file per run, containing per-process aggregates:
+One JSON file per run: a run-level `status` (`completed`, or `failed` when
+any task failed or the workflow aborted) and per-process aggregates:
 
 | Field | Meaning |
 |---|---|
@@ -184,7 +188,9 @@ pipx run nf-runinsights-dashboard   # http://localhost:8765
 pipx run nf-runinsights-dashboard --history /shared/team/runinsights
 ```
 
-The page header shows which store it is reading.
+The page header shows which store it is reading. Failed runs are hidden
+until you tick "Show failed runs", so they never end up as a baseline by
+accident.
 
 From a repo checkout the old door still works, no install at all:
 
@@ -244,8 +250,10 @@ leaves the deterministic report untouched.
   Docker or a Linux executor for those columns.
 - Tasks under a few seconds have noisy timings. The thresholds filter most
   of it, but treat sub-second deltas as noise.
-- Failed or partial runs are recorded and can distort baselines. Check the
-  process count before using a run as a comparison baseline.
+- Failed runs are recorded but kept out of baselines and trends unless you
+  opt in (`includeFailed` in the plugin config, `include_failed` on the MCP
+  tool, the checkbox in the dashboard). Runs recorded before plugin 0.2
+  carry no status and count as completed.
 - Local scripts are identified by filename, so two different pipelines both
   named `main.nf` share a history. Registered pipelines such as
   `nf-core/sarek` are unambiguous.

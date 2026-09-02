@@ -150,6 +150,28 @@ def test_trend_unknown_process_is_error(make_run):
     assert "error" in store.process_trend("GHOST")
 
 
+def test_trend_leaves_failed_runs_out_unless_asked(make_run):
+    make_run("a", "2026-01-01T10:00:00", processes={"FOO": proc(1000)})
+    make_run("b", "2026-01-02T10:00:00", processes={"FOO": proc(9000)},
+             status="failed")
+    make_run("c", "2026-01-03T10:00:00", processes={"FOO": proc(3000)},
+             status="completed")
+    assert store.process_trend("FOO")["overall_median_ms"] == 2000
+    assert store.process_trend("FOO", include_failed=True)["overall_median_ms"] == 3000
+
+
+def test_trend_only_in_failed_runs_says_so(make_run):
+    make_run("b", "2026-01-02T10:00:00", processes={"FOO": proc(9000)},
+             status="failed")
+    assert "failed" in store.process_trend("FOO")["error"]
+
+
+def test_runs_summary_reports_status(make_run):
+    make_run("a", "2026-01-01T10:00:00")
+    make_run("b", "2026-01-02T10:00:00", status="failed")
+    assert [r["status"] for r in store.runs_summary()] == ["completed", "failed"]
+
+
 # --- ask --------------------------------------------------------------------
 
 def test_ask_never_raises_without_credentials(make_run, monkeypatch):

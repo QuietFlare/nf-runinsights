@@ -39,8 +39,9 @@ def build_server():
 
     @mcp.tool()
     def list_runs(pipeline: str | None = None) -> str:
-        """List every recorded pipeline run (name, timestamp, pipeline),
-        oldest first. Optionally filter by pipeline name, e.g. 'nf-core/sarek'."""
+        """List every recorded pipeline run (name, timestamp, pipeline,
+        status), oldest first. Optionally filter by pipeline name, e.g.
+        'nf-core/sarek'. Status is 'failed' for crashed or partial runs."""
         return json.dumps(store.runs_summary(pipeline), indent=1)
 
     @mcp.tool()
@@ -60,11 +61,16 @@ def build_server():
         return json.dumps(store.compare(run_names), indent=1)
 
     @mcp.tool()
-    def get_process_trend(process: str, pipeline: str | None = None) -> str:
-        """History of one process across all recorded runs, how its median
+    def get_process_trend(
+        process: str, pipeline: str | None = None, include_failed: bool = False
+    ) -> str:
+        """History of one process across recorded runs, how its median
         task time, memory, and queue wait evolved. Accepts short names
-        ('FASTQC') or full names ('NFCORE_SAREK:SAREK:FASTQC')."""
-        return json.dumps(store.process_trend(process, pipeline), indent=1)
+        ('FASTQC') or full names ('NFCORE_SAREK:SAREK:FASTQC'). Failed
+        runs are left out unless include_failed is true."""
+        return json.dumps(
+            store.process_trend(process, pipeline, include_failed), indent=1
+        )
 
     return mcp
 
